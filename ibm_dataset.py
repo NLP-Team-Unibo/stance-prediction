@@ -3,7 +3,7 @@ import os
 import pandas as pd
 
 class IBMDebater(Dataset):
-    def __init__(self, path, split, tokenizer, text_transform=None, audio_transform=None):
+    def __init__(self, path, split, tokenizer=None, text_transform=None, audio_transform=None):
         self.path = path
         self.tokenizer = tokenizer
         self.text_transform = text_transform
@@ -33,17 +33,13 @@ class IBMDebater(Dataset):
         with open(text_path, 'r') as f:
             text = f.read()
             motion = self.annotations['motion'].iloc[idx]
-        encoded_dict = self.tokenizer(motion, text, truncation=True, max_length=512, verbose=False)
-        ids = encoded_dict['input_ids']
-        seg = encoded_dict['token_type_ids']
-        att = encoded_dict['attention_mask']
 
         audio = []#torchaudio.load(audio_path)
-
+        if self.tokenizer:
+            text = self.tokenizer(motion, text, truncation=True, max_length=512)
         if self.text_transform:
-            ids = self.text_transform(ids)
-            seg = self.text_transform(seg)
-            att = self.text_transform(att)
+            for k in text.keys():
+                text[k] = self.text_transform(text[k])
         if self.audio_transform:
             audio = self.audio_transform(audio)
         
@@ -52,4 +48,4 @@ class IBMDebater(Dataset):
             label = 1.0
         else:
             label = 0.0
-        return [ids, seg, att], audio, label
+        return text, audio, label
