@@ -5,10 +5,10 @@ import torchaudio
 import torch
 
 class IBMDebater(Dataset):
-    def __init__(self, path, split, tokenizer=None, audio_bundle=None, max_audio_len=25, text_transform=None, audio_transform=None, load_audio=True, load_text=True,):
+    def __init__(self, path, split, tokenizer=None, audio_processor=None, max_audio_len=25, text_transform=None, audio_transform=None, load_audio=True, load_text=True,):
         self.path = path
         self.tokenizer = tokenizer
-        self.audio_bundle = audio_bundle
+        self.audio_processor = audio_processor
         self.text_transform = text_transform
         self.audio_transform = audio_transform
         self.load_audio = load_audio
@@ -49,10 +49,11 @@ class IBMDebater(Dataset):
 
         if self.load_audio:
             wave, sr = torchaudio.load(audio_path)
-            wave = torchaudio.functional.resample(wave, sr, self.audio_bundle.sample_rate)
-            wave = wave[:, :self.max_audio_len*self.audio_bundle.sample_rate]
-            wave = torch.mean(wave, dim=0)
-            output.append(wave)
+            wave = torchaudio.functional.resample(wave, sr, 16000)
+            w_l = wave.size(1)
+            waves = [torch.mean(wave[:, i:i+self.max_audio_len*16000], dim=0) for i in range(0, w_l, self.max_audio_len*16000)]
+            waves[-1] = torch.nn.functional.pad(waves[-1], (0, self.max_audio_len*16000 - len(waves[-1])))
+            output.append(waves)
         
         label = self.annotations['speech-to-motion-polarity'].iloc[idx]
         if label == 'pro':
