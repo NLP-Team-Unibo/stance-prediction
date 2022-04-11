@@ -5,10 +5,9 @@ import torchaudio
 import torch
 
 class IBMDebater(Dataset):
-    def __init__(self, path, split, tokenizer=None, audio_processor=None, max_audio_len=25, text_transform=None, audio_transform=None, load_audio=True, load_text=True,):
+    def __init__(self, path, split, tokenizer=None, max_audio_len=25, text_transform=None, audio_transform=None, load_audio=True, load_text=True):
         self.path = path
         self.tokenizer = tokenizer
-        self.audio_processor = audio_processor
         self.text_transform = text_transform
         self.audio_transform = audio_transform
         self.load_audio = load_audio

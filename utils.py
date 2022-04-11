@@ -1,3 +1,4 @@
+from re import A
 import torch
 
 # Data loader creation
@@ -34,3 +35,10 @@ def batch_generator_wav2vec(batch):
     x = torch.split(x, 1)
     x = [x.squeeze(0) for x in x]
     return x, torch.FloatTensor([b[1] for b in batch])
+
+def batch_generator_multimodal(batch):
+    batch_text = [[b[0], b[2]] for b in batch]
+    batch_audio = [[b[1], b[2]] for b in batch]
+    text_tensor, _ = batch_generator_text(batch_text)
+    audio_tensor, labels = batch_generator_wav2vec(batch_audio)
+    return text_tensor, audio_tensor, labels
