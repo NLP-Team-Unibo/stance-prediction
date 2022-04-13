@@ -1,28 +1,29 @@
 from torch import optim
 from torch import nn
 import torch
-
+from tqdm import tqdm
+from torch.utils.tensorboard import SummaryWriter
 def train_loop(model, loader_train, loader_val, epochs, device):
     if device == 'cuda':
         model.cuda()
-    
+    writer = SummaryWriter('log/', flush_secs=1)
     optimizer = optim.Adam(model.parameters(), lr=2e-5)
     criterion = nn.BCEWithLogitsLoss()
 
     for i in range(epochs):
-        train(model, optimizer, criterion, loader_train, device)
+        train(model, optimizer, criterion, loader_train, device, writer)
         validate(model, criterion, loader_val, device)
 
-def train(model, optimizer, criterion, data_loader, device):
+def train(model, optimizer, criterion, data_loader, device, writer):
     model.train()
     total_loss = 0.0
     total_acc = 0.0
     total = 0
-    for data in data_loader:
+    for i, data in enumerate(tqdm(data_loader)):
         input_dict = data[0]
         input_dict = {k:input_dict[k].to(device) for k in input_dict.keys()}
         
-        labels = data[2].to(device)
+        labels = data[1].to(device)
         output = model(**input_dict)
         output = output.squeeze(1)
         loss = criterion(output, labels)
@@ -31,7 +32,7 @@ def train(model, optimizer, criterion, data_loader, device):
         acc = ((output > 0).float() == labels).sum().item()
         total_acc += acc
         total += labels.size(0)
-
+        writer.add_scalar('Train Loss', loss.item(), i)
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
@@ -49,7 +50,7 @@ def validate(model, criterion, data_loader, device):
             input_dict = data[0]
             input_dict = {k:input_dict[k].to(device) for k in input_dict.keys()}
 
-            labels = data[2].to(device)
+            labels = data[1].to(device)
             #output = model(input_ids, segment_tensors, attention_mask)
             output = model(**input_dict)
             output = output.squeeze(1)

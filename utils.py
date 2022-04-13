@@ -1,4 +1,3 @@
-from re import A
 import torch
 
 # Data loader creation

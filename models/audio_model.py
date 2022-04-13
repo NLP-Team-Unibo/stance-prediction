@@ -14,12 +14,16 @@ class AudioModel(nn.Module):
         
         for param in self.wav2vec2.parameters():
             param.requires_grad = False
-        for layer in self.wav2vec2.conv_layers[-2:]:
+        """ for layer in self.wav2vec2.conv_layers[-2:]:
             for param in layer.parameters():
-                param.requires_grad = True
+                param.requires_grad = True """
         self.linear = nn.Linear(249, dim)
-        self.classifier= nn.Linear(512, 1)
+        self.bilstm = nn.LSTM(input_size=512, hidden_size=256, bidirectional=True)
+        self.pre_classifier = nn.Linear(512, 512)
         self.relu = nn.ReLU()
+        if classify:
+            self.classifier= nn.Linear(512, 1)
+        
     
     def forward(self, waves):
         outs = []
@@ -29,10 +33,13 @@ class AudioModel(nn.Module):
             x = x.transpose(1, 2)
             x = self.linear(x)
             outs.append(x)
-        
         x = torch.cat(outs, dim=2)
-        x = torch.mean(x, dim=2)
+        x = x.transpose(1, 2)
+        x = self.bilstm(x)[0]
+        x = x[:,-1,:]
+        x = self.pre_classifier(x)
+        #x = torch.mean(x, dim=2)
+        x = self.relu(x)
         if self.classify:
             x = self.classifier(x)
-            x = self.relu(x)
         return x
