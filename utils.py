@@ -41,3 +41,11 @@ def batch_generator_multimodal(batch):
     text_tensor, _ = batch_generator_text(batch_text)
     audio_tensor, labels = batch_generator_wav2vec(batch_audio)
     return text_tensor, audio_tensor, labels
+
+def get_params_groups(model, optimizer_args):
+    params = []
+    for name, module in model.named_modules():
+        for i in range(len(optimizer_args['params'])):
+            if optimizer_args['params'][i] == name:
+                params.append({'params':module.parameters(), 'lr':optimizer_args['lr'][i]})
+    return params

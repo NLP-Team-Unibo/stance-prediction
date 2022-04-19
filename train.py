@@ -4,14 +4,22 @@ import torch
 from tqdm import tqdm
 from early_stopping import EarlyStopping
 from torch.utils.tensorboard import SummaryWriter
-def train_loop(model, loader_train, loader_val, epochs, device):
+def train_loop(
+        model, 
+        optimizer, 
+        criterion, 
+        early_stopping, 
+        loader_train, 
+        loader_val, 
+        epochs, 
+        device,
+        step_lr=None,
+        cfg=''
+    ):
     if device == 'cuda':
         model.cuda()
     writer = SummaryWriter('log/', flush_secs=1)
-    optimizer = optim.Adam(model.parameters(), lr=2e-5)
-    step_lr = optim.lr_scheduler.StepLR(optimizer=optimizer, step_size=10, gamma=0.1)
-    criterion = nn.BCEWithLogitsLoss()
-    early_stopping = EarlyStopping(model, patience=3)
+    writer.add_text('CFG', text_string=str(cfg))
 
     for i in range(epochs):
         train_results = train(model, optimizer, criterion, loader_train, device)
@@ -21,11 +29,12 @@ def train_loop(model, loader_train, loader_val, epochs, device):
         writer.add_scalar('Train accuracy', train_results['train_accuracy'], i)
         writer.add_scalar('Val loss', val_results['val_loss'], i)
         writer.add_scalar('Val accuracy', val_results['val_accuracy'], i)
-
-        if early_stopping(val_results['val_accuracy']):
-            model.load_state_dict(early_stopping.best_weights)
-            break
-        step_lr.step()
+        if early_stopping:
+            if early_stopping(val_results['val_accuracy']):
+                model.load_state_dict(early_stopping.best_weights)
+                break
+        if step_lr:
+            step_lr.step()
         
 
 def train(model, optimizer, criterion, data_loader, device):
@@ -34,12 +43,23 @@ def train(model, optimizer, criterion, data_loader, device):
     total_acc = 0.0
     total = 0
     results = {}
-    for i, data in enumerate(tqdm(data_loader)):
-        input_dict = data[0]
-        input_dict = {k:input_dict[k].to(device) for k in input_dict.keys()}
-        
-        labels = data[1].to(device)
-        output = model(**input_dict)
+    model_name = model.__class__.__name__
+    for data in tqdm(data_loader):
+        if model_name == 'TextModel':
+            input_dict = data[0]
+            input_dict = {k:input_dict[k].to(device) for k in input_dict.keys()}
+            labels = data[1].to(device)
+            output = model(**input_dict)
+        elif model_name == 'AudioModel':
+            waves = data[0]
+            labels = data[1].to(device)
+            output = model(waves)
+        else:
+            input_dict = data[0]
+            input_dict = {k:input_dict[k].to(device) for k in input_dict.keys()}
+            waves = data[1]
+            labels = data[2].to(device)
+            output = model(input_dict, waves)
         output = output.squeeze(1)
         loss = criterion(output, labels)
         total_loss += loss.item()
@@ -63,15 +83,23 @@ def validate(model, criterion, data_loader, device):
         total_acc = 0.0
         total = 0
         results = {}
+        model_name = model.__class__.__name__
         for data in data_loader:
-            #input_ids, segment_tensors, attention_mask = [torch.squeeze(d) for d in data[0].split(1, dim=1)]
-            #input_ids, segment_tensors, attention_mask = input_ids.to(device), segment_tensors.to(device), attention_mask.to(device)
-            input_dict = data[0]
-            input_dict = {k:input_dict[k].to(device) for k in input_dict.keys()}
-
-            labels = data[1].to(device)
-            #output = model(input_ids, segment_tensors, attention_mask)
-            output = model(**input_dict)
+            if model_name == 'TextModel':
+                input_dict = data[0]
+                input_dict = {k:input_dict[k].to(device) for k in input_dict.keys()}
+                labels = data[1].to(device)
+                output = model(**input_dict)
+            elif model_name == 'AudioModel':
+                waves = data[0]
+                labels = data[1].to(device)
+                output = model(waves)
+            else:
+                input_dict = data[0]
+                input_dict = {k:input_dict[k].to(device) for k in input_dict.keys()}
+                waves = data[1]
+                labels = data[2].to(device)
+                output = model(input_dict, waves)
             output = output.squeeze(1)
 
             loss = criterion(output, labels)
