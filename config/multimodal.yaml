@@ -2,13 +2,15 @@ MODEL:
   NAME: 'multimodal'
   TEXT:
     CLASSIFY: False
+  MULTIMODAL:
+    FREEZE_TEXT: True
 TRAIN:
   OPTIMIZER_ARGS: {'params':['classifier', 'text_model', 'audio_model'], 'lr':[0.001, 0.00002, 0.00002]}
   LR_SCHEDULER: {'step_size': 10, 'gamma':0.1}
+  EPOCHS: 2
 DATASET:
   SMALL_VERSION: True
   LOAD_AUDIO: True
   LOAD_TEXT: True
   LOADER:
     BATCH_SIZE: 8
-

@@ -1,8 +1,9 @@
 import torch
 from torch import nn
 import torchaudio
+from models.stance_prediction_module import StancePredictionModule
 
-class AudioModel(nn.Module):
+class AudioModel(StancePredictionModule):
     def __init__(
         self, 
         chunk_length=10, 

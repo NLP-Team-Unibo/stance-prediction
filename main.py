@@ -19,8 +19,6 @@ from train import train_loop
 transformers.logging.set_verbosity_error()
 from config import config
 
-
-
 def get_model(cfg):
     model = None
     model_name = cfg.MODEL.NAME
@@ -47,10 +45,16 @@ def get_model(cfg):
                         )
                     )
     if cfg.MODEL.NAME == 'multimodal':
+        if cfg.MODEL.MULTIMODAL.LOAD_TEXT_CHECKPOINT:
+            models[0].load_backbone(cfg.MODEL.MULTIMODAL.TEXT_CHECPOINT_PATH, drop_classifier=True)
+        if cfg.MODEL.MULTIMODAL.LOAD_AUDIO_CHECKPOINT:
+            models[1].load_backbone(cfg.MODEL.MULTIMODAL.AUDIO_CHECPOINT_PATH, drop_classifier=True)
         model = MultimodalModel(
                         text_model=models[0],
                         audio_model=models[1],
-                        p_list=cfg.MODEL.MULTIMODAL.DROPOUT_VALUES
+                        p_list=cfg.MODEL.MULTIMODAL.DROPOUT_VALUES,
+                        freeze_text=cfg.MODEL.MULTIMODAL.FREEZE_TEXT,
+                        freeze_audio=cfg.MODEL.MULTIMODAL.FREEZE_AUDIO
                     )
     else:
         model = models[0]
@@ -126,6 +130,10 @@ def train_pipeline(cfg):
     criterion = nn.BCEWithLogitsLoss()
 
     train_loop(model, optimizer, criterion, early_stopping, loader_train, loader_val, epochs, device, step_lr=scheduler, cfg=cfg)
+
+    if cfg.TRAIN.SAVE_CHECKPOINT:
+        path = cfg.TRAIN.CHECKPOINT_PATH
+        model.save_backbone(path)
 
 if __name__ == '__main__':
     cfg = config.get_cfg_defaults()

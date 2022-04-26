@@ -1,0 +1,49 @@
+DATASET:
+  CHUNK_LENGTH: 5
+  DATA_PATH: data/ibm_debater/full
+  LOADER:
+    BATCH_SIZE: 16
+    DROP_LAST: true
+  LOAD_AUDIO: false
+  LOAD_TEXT: true
+  SMALL_VERSION: false
+  TOKENIZER: distilbert-base-uncased
+MODEL:
+  AUDIO:
+    BILSTM_HIDDEN_SIZE: 256
+    CLASSIFY: false
+    DOWNSAMPLER_OUT_DIM: 32
+    DROPOUT_VALUES:
+    - 0.3
+    - 0.3
+    - 0.3
+    N_TRAINABLE_LAYERS: 2
+    PRE_CLASSIFIER: true
+  MULTIMODAL:
+    AUDIO_CHECKPOINT_PATH: checkpoints/audio_model.pkl
+    DROPOUT_VALUES:
+    - 0.3
+    LOAD_AUDIO_CHECKPOINT: false
+    LOAD_TEXT_CHECKPOINT: false
+    TEXT_CHECKPOINT_PATH: checkpoints/text_model.pkl
+  NAME: text
+  TEXT:
+    CLASSIFY: true
+    DISTILBERT: distilbert-base-uncased
+    DROPOUT_VALUES:
+    - 0.3
+    - 0.3
+    N_TRAINABLE_LAYERS: 2
+    PRE_CLASSIFIER: true
+SETTINGS:
+  DEVICE: cuda
+TRAIN:
+  CHECKPOINTS_PATH: checkpoints/
+  EARLY_STOPPING:
+    PATIENCE: 3
+  EPOCHS: 20
+  LR: 2.0e-05
+  LR_SCHEDULER: {}
+  OPTIMIZER: adam
+  OPTIMIZER_ARGS: {}
+  SAVE_CHECKPOINT: false

@@ -1,8 +1,9 @@
 import torch
 from torch import nn
 from transformers import DistilBertModel
+from models.stance_prediction_module import StancePredictionModule
 
-class TextModel(nn.Module):
+class TextModel(StancePredictionModule):
     def __init__(
         self, 
         distilbert_type='distilbert-base-uncased',

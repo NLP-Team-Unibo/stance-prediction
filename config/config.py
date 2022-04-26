@@ -38,11 +38,20 @@ _C.MODEL.AUDIO.PRE_CLASSIFIER = True
 _C.MODEL.MULTIMODAL = CN()
 _C.MODEL.MULTIMODAL.DROPOUT_VALUES = [0.3]
 
+_C.MODEL.MULTIMODAL.LOAD_TEXT_CHECKPOINT = False
+_C.MODEL.MULTIMODAL.LOAD_AUDIO_CHECKPOINT = False
+_C.MODEL.MULTIMODAL.TEXT_CHECKPOINT_PATH = ''
+_C.MODEL.MULTIMODAL.AUDIO_CHECKPOINT_PATH = ''
+_C.MODEL.MULTIMODAL.FREEZE_TEXT = False
+_C.MODEL.MULTIMODAL.FREEZE_AUDIO = False
+
 _C.TRAIN = CN()
 _C.TRAIN.OPTIMIZER = 'adam'
 _C.TRAIN.OPTIMIZER_ARGS = CN(new_allowed=True)
 _C.TRAIN.LR = 2e-5
 _C.TRAIN.LR_SCHEDULER = CN(new_allowed=True)
+_C.TRAIN.SAVE_CHECKPOINT = False
+_C.TRAIN.CHECKPOINT_PATH = ''
 
 _C.TRAIN.EARLY_STOPPING = CN()
 _C.TRAIN.EARLY_STOPPING.PATIENCE = 3
@@ -50,7 +59,10 @@ _C.TRAIN.EARLY_STOPPING.PATIENCE = 3
 _C.TRAIN.EPOCHS = 20
 
 def get_cfg_defaults():
-  """Get a yacs CfgNode object with default values for my_project."""
-  # Return a clone so that the defaults will not be altered
-  # This is for the "local variable" use pattern
   return _C.clone()
+
+def save_cfg_default():
+  with open('config/default.yaml', 'w') as f:
+    f.write(_C.dump())
+    f.flush()
+    f.close()
