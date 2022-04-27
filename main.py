@@ -46,9 +46,9 @@ def get_model(cfg):
                     )
     if cfg.MODEL.NAME == 'multimodal':
         if cfg.MODEL.MULTIMODAL.LOAD_TEXT_CHECKPOINT:
-            models[0].load_backbone(cfg.MODEL.MULTIMODAL.TEXT_CHECPOINT_PATH, drop_classifier=True)
+            models[0].load_backbone(cfg.MODEL.MULTIMODAL.TEXT_CHECKPOINT_PATH, drop_classifier=True)
         if cfg.MODEL.MULTIMODAL.LOAD_AUDIO_CHECKPOINT:
-            models[1].load_backbone(cfg.MODEL.MULTIMODAL.AUDIO_CHECPOINT_PATH, drop_classifier=True)
+            models[1].load_backbone(cfg.MODEL.MULTIMODAL.AUDIO_CHECKPOINT_PATH, drop_classifier=True)
         model = MultimodalModel(
                         text_model=models[0],
                         audio_model=models[1],

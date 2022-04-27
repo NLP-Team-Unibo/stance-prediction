@@ -9,7 +9,7 @@ class StancePredictionModule(nn.Module):
         super(StancePredictionModule, self).__init__()
     
     def save_backbone(self, path):
-        os.makedirs(''.join(path.split('/')[:-1]), exist_ok=True)
+        os.makedirs('/'.join(path.split('/')[:-1]), exist_ok=True)
         torch.save(self.state_dict(), path)
 
     def load_backbone(self, path, drop_classifier=False):
