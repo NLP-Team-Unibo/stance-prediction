@@ -26,9 +26,7 @@ class MultimodalModel(StancePredictionModule):
         if freeze_audio: freeze_model(self.audio_model)
         
         self.dropout = nn.Dropout(p=p_list[0])
-        self.classifier = nn.Linear(512+768, 1)
-
-        #self.relu = nn.ReLU()
+        self.classifier = nn.Linear(2*768, 1)
     
     def forward(self, text_input, audio_input):
         x = self.text_model(**text_input)
@@ -36,5 +34,4 @@ class MultimodalModel(StancePredictionModule):
         x = torch.cat([x, y], dim=1)
         x = self.dropout(x)
         x = self.classifier(x)
-        #x = self.relu(x)
         return x

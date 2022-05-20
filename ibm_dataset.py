@@ -19,6 +19,7 @@ class IBMDebater(Dataset):
         self.annotations = pd.read_csv(metadata_path, delimiter=',')
         split_id = self.split_file['motion-id'][self.split_file['set'].str.lower() == split]
         self.annotations = self.annotations[self.annotations['motion-id'].isin(split_id)]
+        #self.audio_transform = torchaudio.transforms.Resample(orig_freq=sr, new_freq=16000)
 
         with open('wav_corrections.txt', 'r') as f:
             corr = f.read().splitlines()
@@ -47,12 +48,20 @@ class IBMDebater(Dataset):
             output.append(text)
 
         if self.load_audio:
-            wave, sr = torchaudio.load(audio_path)
-            wave = torchaudio.functional.resample(wave, sr, 16000)
-            w_l = wave.size(1)
-            waves = [torch.mean(wave[:, i:i+self.max_audio_len*16000], dim=0) for i in range(0, w_l, self.max_audio_len*16000)]
-            waves[-1] = torch.nn.functional.pad(waves[-1], (0, self.max_audio_len*16000 - len(waves[-1])))
-            output.append(waves)
+            #wave, sr = torchaudio.load(audio_path)
+            #sr = librosa.get_samplerate(audio_path)
+            #stream = librosa.stream(audio_path, duration=self.max_audio_len)
+            #wave, sr = next(stream)
+            wave, sr = librosa.load(audio_path, duration=self.max_audio_len)
+            wave = torch.tensor(wave)
+            wave = torchaudio.transforms.Resample(orig_freq=sr, new_freq=16000)(wave)
+            #w_l = wave.size(1)
+            #waves = [torch.mean(wave[:, i:i+self.max_audio_len*16000], dim=0) for i in range(0, w_l, self.max_audio_len*16000)]
+            #waves[-1] = torch.nn.functional.pad(waves[-1], (0, self.max_audio_len*16000 - len(waves[-1])))
+            #output.append(waves)
+            #wave = torch.mean(wave, dim=0)
+            output.append(wave)
+
         
         label = self.annotations['speech-to-motion-polarity'].iloc[idx]
         if label == 'pro':

@@ -35,10 +35,8 @@ def get_model(cfg):
     if model_name == 'audio' or model_name == 'multimodal':
         models.append(AudioModel(
                             chunk_length=cfg.DATASET.CHUNK_LENGTH, 
-                            downsampler_out_dim=cfg.MODEL.AUDIO.DOWNSAMPLER_OUT_DIM,
+                            n_transformers=cfg.MODEL.AUDIO.N_TRANSFORMERS,
                             n_trainable_layers=cfg.MODEL.AUDIO.N_TRAINABLE_LAYERS,
-                            bilstm_hidden_size=cfg.MODEL.AUDIO.BILSTM_HIDDEN_SIZE,
-                            device=cfg.SETTINGS.DEVICE,
                             p_list=cfg.MODEL.AUDIO.DROPOUT_VALUES,
                             pre_classifier=cfg.MODEL.AUDIO.PRE_CLASSIFIER,
                             classify=cfg.MODEL.AUDIO.CLASSIFY
@@ -100,16 +98,19 @@ def train_pipeline(cfg):
 
     batch_size = cfg.DATASET.LOADER.BATCH_SIZE
     drop_last = cfg.DATASET.LOADER.DROP_LAST
+    num_workers = cfg.DATASET.LOADER.NUM_WORKERS
     loader_train = DataLoader(data_train,
                         batch_size=batch_size,
                         shuffle=True,
                         collate_fn=collate_fn,
-                        drop_last=drop_last)
+                        drop_last=drop_last,
+                        num_workers=num_workers)
     loader_val = DataLoader(data_val,
                         batch_size=batch_size,
                         shuffle=False,
                         collate_fn=collate_fn,
-                        drop_last=drop_last)
+                        drop_last=drop_last,
+                        num_workers=num_workers)
 
     model = get_model(cfg)
 

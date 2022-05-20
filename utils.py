@@ -24,7 +24,7 @@ def batch_generator_text(batch):
     return texts, torch.FloatTensor([b[1] for b in batch])
 
 def batch_generator_wav2vec(batch):
-    max_chunks = 10000
+    """max_chunks = 10000
     for b in batch:
         max_chunks = min(len(b[0]), max_chunks)
     for i in range(len(batch)):
@@ -32,8 +32,8 @@ def batch_generator_wav2vec(batch):
     x = torch.stack([torch.stack(b[0], dim=0) for b in batch], dim=0)
     x = x.transpose(0, 1)
     x = torch.split(x, 1)
-    x = [x.squeeze(0) for x in x]
-    return x, torch.FloatTensor([b[1] for b in batch])
+    x = [x.squeeze(0) for x in x]"""
+    return torch.stack([b[0] for b in batch], dim = 0), torch.FloatTensor([b[1] for b in batch])
 
 def batch_generator_multimodal(batch):
     batch_text = [[b[0], b[2]] for b in batch]

@@ -51,13 +51,13 @@ def train(model, optimizer, criterion, data_loader, device):
             labels = data[1].to(device)
             output = model(**input_dict)
         elif model_name == 'AudioModel':
-            waves = data[0]
+            waves = data[0].to(device)
             labels = data[1].to(device)
             output = model(waves)
         else:
             input_dict = data[0]
             input_dict = {k:input_dict[k].to(device) for k in input_dict.keys()}
-            waves = data[1]
+            waves = data[1].to(device)
             labels = data[2].to(device)
             output = model(input_dict, waves)
         output = output.squeeze(1)
@@ -91,13 +91,13 @@ def validate(model, criterion, data_loader, device):
                 labels = data[1].to(device)
                 output = model(**input_dict)
             elif model_name == 'AudioModel':
-                waves = data[0]
+                waves = data[0].to(device)
                 labels = data[1].to(device)
                 output = model(waves)
             else:
                 input_dict = data[0]
                 input_dict = {k:input_dict[k].to(device) for k in input_dict.keys()}
-                waves = data[1]
+                waves = data[1].to(device)
                 labels = data[2].to(device)
                 output = model(input_dict, waves)
             output = output.squeeze(1)

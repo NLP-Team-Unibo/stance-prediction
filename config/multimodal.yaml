@@ -1,16 +1,51 @@
-MODEL:
-  NAME: 'multimodal'
-  TEXT:
-    CLASSIFY: False
-  MULTIMODAL:
-    FREEZE_TEXT: True
-TRAIN:
-  OPTIMIZER_ARGS: {'params':['classifier', 'text_model', 'audio_model'], 'lr':[0.001, 0.00002, 0.00002]}
-  LR_SCHEDULER: {'step_size': 10, 'gamma':0.1}
-  EPOCHS: 2
 DATASET:
-  SMALL_VERSION: True
-  LOAD_AUDIO: True
-  LOAD_TEXT: True
+  CHUNK_LENGTH: 15
+  DATA_PATH: data/ibm_debater/full
   LOADER:
-    BATCH_SIZE: 8
+    BATCH_SIZE: 4
+    DROP_LAST: true
+    NUM_WORKERS: 0
+  LOAD_AUDIO: true
+  LOAD_TEXT: true
+  SMALL_VERSION: false
+  TOKENIZER: distilbert-base-uncased
+MODEL:
+  AUDIO:
+    CLASSIFY: false
+    DROPOUT_VALUES:
+    - 0.3
+    - 0.3
+    - 0.3
+    N_TRAINABLE_LAYERS: 4
+    N_TRANSFORMERS: 4
+    PRE_CLASSIFIER: true
+  MULTIMODAL:
+    AUDIO_CHECKPOINT_PATH: ''
+    DROPOUT_VALUES:
+    - 0.3
+    FREEZE_AUDIO: false
+    FREEZE_TEXT: false
+    LOAD_AUDIO_CHECKPOINT: false
+    LOAD_TEXT_CHECKPOINT: false
+    TEXT_CHECKPOINT_PATH: ''
+  NAME: multimodal
+  TEXT:
+    CLASSIFY: false
+    DISTILBERT: distilbert-base-uncased
+    DROPOUT_VALUES:
+    - 0.3
+    - 0.3
+    N_TRAINABLE_LAYERS: 2
+    PRE_CLASSIFIER: true
+SETTINGS:
+  DEVICE: cuda
+TRAIN:
+  CHECKPOINT_PATH: ''
+  EARLY_STOPPING:
+    PATIENCE: 3
+  EPOCHS: 20
+  LR: 2.0e-05
+  LR_SCHEDULER: {}
+  OPTIMIZER: adam
+  OPTIMIZER_ARGS: {}
+  SAVE_CHECKPOINT: false
