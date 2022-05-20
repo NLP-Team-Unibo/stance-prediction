@@ -9,7 +9,7 @@ class AudioModel(StancePredictionModule):
         chunk_length=10, 
         n_transformers=12,
         n_trainable_layers=2,
-        p_list=(0.3, 0.3, 0.3),
+        p_list=(0.3, 0.3),
         pre_classifier=True,
         classify=False
     ):
@@ -27,11 +27,11 @@ class AudioModel(StancePredictionModule):
         for layer in self.wav2vec2.encoder.transformer.layers[-n_trainable_layers:]:
             for param in layer.parameters():
                 param.requires_grad = True
-        self.dropout2 = nn.Dropout(p=p_list[1])
+        self.dropout1 = nn.Dropout(p=p_list[0])
         self.pre_classifier = pre_classifier
         if pre_classifier:
             self.pre_classifier = nn.Linear(768, 768)
-            self.dropout3 = nn.Dropout(p=p_list[2])
+            self.dropout2 = nn.Dropout(p=p_list[1])
         self.relu = nn.ReLU()
         if classify:
             self.classifier= nn.Linear(768, 1)
@@ -40,10 +40,10 @@ class AudioModel(StancePredictionModule):
     def forward(self, audio):
         x, _ = self.wav2vec2(audio)
         x = torch.mean(x, dim=1)
-        x = self.dropout2(x)
+        x = self.dropout1(x)
         if self.pre_classifier:
             x = self.pre_classifier(x)
-            x = self.dropout3(x)
+            x = self.dropout2(x)
         x = self.relu(x)
         if self.classify:
             x = self.classifier(x)

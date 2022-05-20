@@ -15,7 +15,6 @@ MODEL:
     DROPOUT_VALUES:
     - 0.3
     - 0.3
-    - 0.3
     N_TRAINABLE_LAYERS: 2
     N_TRANSFORMERS: 12
     PRE_CLASSIFIER: true
