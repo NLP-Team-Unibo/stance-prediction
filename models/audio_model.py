@@ -20,13 +20,15 @@ class AudioModel(StancePredictionModule):
         self.classify = classify
         self.__bundle = torchaudio.pipelines.WAV2VEC2_BASE
         self.wav2vec2 = self.__bundle.get_model()
-        self.wav2vec2.encoder.transformer.layers = self.wav2vec2.encoder.transformer.layers[:n_trainable_layers]
+        self.wav2vec2.encoder.transformer.layers = self.wav2vec2.encoder.transformer.layers[:n_transformers]
         
         for param in self.wav2vec2.parameters():
             param.requires_grad = False
-        for layer in self.wav2vec2.encoder.transformer.layers[-n_trainable_layers:]:
-            for param in layer.parameters():
-                param.requires_grad = True
+        
+        if n_trainable_layers > 0:
+            for layer in self.wav2vec2.encoder.transformer.layers[-n_trainable_layers:]:
+                for param in layer.parameters():
+                    param.requires_grad = True
         self.dropout1 = nn.Dropout(p=p_list[0])
         self.pre_classifier = pre_classifier
         if pre_classifier:

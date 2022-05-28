@@ -1,4 +1,3 @@
-from gc import freeze
 import torch
 from torch import nn
 from models.stance_prediction_module import StancePredictionModule
@@ -14,7 +13,7 @@ class MultimodalModel(StancePredictionModule):
             self, 
             text_model, 
             audio_model, 
-            p_list = (0.3),
+            p_list = [0.3],
             freeze_text = False,
             freeze_audio = False,
         ):

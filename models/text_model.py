@@ -1,4 +1,3 @@
-import torch
 from torch import nn
 from transformers import DistilBertModel
 from models.stance_prediction_module import StancePredictionModule
@@ -17,9 +16,10 @@ class TextModel(StancePredictionModule):
         self.classify=classify
         for param in self.bert.parameters():
             param.requires_grad = False
-        for layer in self.bert.transformer.layer[-n_trainable_layers:]:
-            for param in layer.parameters():
-                param.requires_grad = True
+        if n_trainable_layers > 0:
+            for layer in self.bert.transformer.layer[-n_trainable_layers:]:
+                for param in layer.parameters():
+                    param.requires_grad = True
         self.dropout1 = nn.Dropout(p=p_list[0])
         self.pre_classifier = pre_classifier
         if pre_classifier:
