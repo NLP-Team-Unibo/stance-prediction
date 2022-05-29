@@ -8,7 +8,6 @@ import utils
 from train_text import train_loop
 from transformers import DistilBertTokenizer
 import torch
-import sys
 import numpy as np
 from torch import nn, optim
 from early_stopping import EarlyStopping

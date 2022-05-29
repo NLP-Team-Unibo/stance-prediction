@@ -24,6 +24,8 @@ def evaluate_pipeline(args):
     state_dict = torch.load(checkpoint_path, device)
     model = utils.get_model(cfg)
     model.load_state_dict(state_dict)
+    if device == 'cuda':
+        model.cuda()
     summary(model)
 
     data_path = cfg.DATASET.DATA_PATH
