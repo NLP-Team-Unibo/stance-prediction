@@ -1,4 +1,7 @@
 import torch
+from models.audio_model import AudioModel
+from models.text_model import TextModel
+from models.multimodal_model import MultimodalModel
 
 # Data loader creation
 # Expected batch: list of text features, audio features, stances with shape respectively of [batch_size, 3, max_len], [batch_size, audio_features_shape??], [batch_size] 
@@ -49,3 +52,42 @@ def get_params_groups(model, optimizer_args):
             if optimizer_args['params'][i] == name:
                 params.append({'params':module.parameters(), 'lr':optimizer_args['lr'][i]})
     return params
+
+def get_model(cfg):
+    model = None
+    model_name = cfg.MODEL.NAME
+    models = []
+    if model_name == 'text' or model_name == 'multimodal':
+        models.append(TextModel(
+                            distilbert_type=cfg.MODEL.TEXT.DISTILBERT,
+                            n_trainable_layers=cfg.MODEL.TEXT.N_TRAINABLE_LAYERS,
+                            p_list=cfg.MODEL.TEXT.DROPOUT_VALUES,
+                            pre_classifier=cfg.MODEL.TEXT.PRE_CLASSIFIER,
+                            classify=cfg.MODEL.TEXT.CLASSIFY
+                        )
+                    )
+    if model_name == 'audio' or model_name == 'multimodal':
+        models.append(AudioModel(
+                            chunk_length=cfg.DATASET.CHUNK_LENGTH, 
+                            n_transformers=cfg.MODEL.AUDIO.N_TRANSFORMERS,
+                            n_trainable_layers=cfg.MODEL.AUDIO.N_TRAINABLE_LAYERS,
+                            p_list=cfg.MODEL.AUDIO.DROPOUT_VALUES,
+                            pre_classifier=cfg.MODEL.AUDIO.PRE_CLASSIFIER,
+                            classify=cfg.MODEL.AUDIO.CLASSIFY
+                        )
+                    )
+    if cfg.MODEL.NAME == 'multimodal':
+        if cfg.MODEL.MULTIMODAL.LOAD_TEXT_CHECKPOINT:
+            models[0].load_backbone(cfg.MODEL.MULTIMODAL.TEXT_CHECKPOINT_PATH, drop_classifier=True)
+        if cfg.MODEL.MULTIMODAL.LOAD_AUDIO_CHECKPOINT:
+            models[1].load_backbone(cfg.MODEL.MULTIMODAL.AUDIO_CHECKPOINT_PATH, drop_classifier=True)
+        model = MultimodalModel(
+                        text_model=models[0],
+                        audio_model=models[1],
+                        p_list=cfg.MODEL.MULTIMODAL.DROPOUT_VALUES,
+                        freeze_text=cfg.MODEL.MULTIMODAL.FREEZE_TEXT,
+                        freeze_audio=cfg.MODEL.MULTIMODAL.FREEZE_AUDIO
+                    )
+    else:
+        model = models[0]
+    return model

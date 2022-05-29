@@ -1,3 +1,4 @@
+from argparse import ArgumentParser
 import torchtext
 from torch.utils.data import DataLoader, random_split
 import transformers
@@ -5,61 +6,24 @@ from transformers import DistilBertTokenizer
 from ibm_dataset import IBMDebater
 import utils
 from train_text import train_loop
-from models.text_model import TextModel
-from models.audio_model import AudioModel
-from models.multimodal_model import MultimodalModel
 from transformers import DistilBertTokenizer
 import torch
 import sys
 import numpy as np
-from torch import nn
-from torch import optim
+from torch import nn, optim
 from early_stopping import EarlyStopping
 from train import train_loop
-transformers.logging.set_verbosity_error()
 from config import config
-
-def get_model(cfg):
-    model = None
-    model_name = cfg.MODEL.NAME
-    models = []
-    if model_name == 'text' or model_name == 'multimodal':
-        models.append(TextModel(
-                            distilbert_type=cfg.MODEL.TEXT.DISTILBERT,
-                            n_trainable_layers=cfg.MODEL.TEXT.N_TRAINABLE_LAYERS,
-                            p_list=cfg.MODEL.TEXT.DROPOUT_VALUES,
-                            pre_classifier=cfg.MODEL.TEXT.PRE_CLASSIFIER,
-                            classify=cfg.MODEL.TEXT.CLASSIFY
-                        )
-                    )
-    if model_name == 'audio' or model_name == 'multimodal':
-        models.append(AudioModel(
-                            chunk_length=cfg.DATASET.CHUNK_LENGTH, 
-                            n_transformers=cfg.MODEL.AUDIO.N_TRANSFORMERS,
-                            n_trainable_layers=cfg.MODEL.AUDIO.N_TRAINABLE_LAYERS,
-                            p_list=cfg.MODEL.AUDIO.DROPOUT_VALUES,
-                            pre_classifier=cfg.MODEL.AUDIO.PRE_CLASSIFIER,
-                            classify=cfg.MODEL.AUDIO.CLASSIFY
-                        )
-                    )
-    if cfg.MODEL.NAME == 'multimodal':
-        if cfg.MODEL.MULTIMODAL.LOAD_TEXT_CHECKPOINT:
-            models[0].load_backbone(cfg.MODEL.MULTIMODAL.TEXT_CHECKPOINT_PATH, drop_classifier=True)
-        if cfg.MODEL.MULTIMODAL.LOAD_AUDIO_CHECKPOINT:
-            models[1].load_backbone(cfg.MODEL.MULTIMODAL.AUDIO_CHECKPOINT_PATH, drop_classifier=True)
-        model = MultimodalModel(
-                        text_model=models[0],
-                        audio_model=models[1],
-                        p_list=cfg.MODEL.MULTIMODAL.DROPOUT_VALUES,
-                        freeze_text=cfg.MODEL.MULTIMODAL.FREEZE_TEXT,
-                        freeze_audio=cfg.MODEL.MULTIMODAL.FREEZE_AUDIO
-                    )
-    else:
-        model = models[0]
-    return model
+transformers.logging.set_verbosity_error()
 
 
-def train_pipeline(cfg):
+def train_pipeline(args):
+    cfg_path = args.cfg_path
+
+    cfg = config.get_cfg_defaults()
+    cfg.merge_from_file(cfg_path)
+    cfg.freeze()
+
     model_name = cfg.MODEL.NAME
     device = cfg.SETTINGS.DEVICE
     data_path = cfg.DATASET.DATA_PATH
@@ -112,7 +76,7 @@ def train_pipeline(cfg):
                         drop_last=drop_last,
                         num_workers=num_workers)
 
-    model = get_model(cfg)
+    model = utils.get_model(cfg)
 
     optimizer = cfg.TRAIN.OPTIMIZER
     optimizer_args = cfg.TRAIN.OPTIMIZER_ARGS
@@ -137,9 +101,7 @@ def train_pipeline(cfg):
         model.save_backbone(path)
 
 if __name__ == '__main__':
-    cfg = config.get_cfg_defaults()
-    if len(sys.argv) > 1:
-        cfg_file = sys.argv[1]
-        cfg.merge_from_file(cfg_file)
-    cfg.freeze()
-    train_pipeline(cfg)
+    args = ArgumentParser()
+    args.add_argument('cfg_path', help='Path of the model\'s configuration file')
+    args = args.parse_args()
+    train_pipeline(args)
