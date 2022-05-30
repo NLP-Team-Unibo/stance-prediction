@@ -1,51 +1,16 @@
-import torch
 from models.audio_model import AudioModel
 from models.text_model import TextModel
 from models.multimodal_model import MultimodalModel
 
-# Data loader creation
-# Expected batch: list of text features, audio features, stances with shape respectively of [batch_size, 3, max_len], [batch_size, audio_features_shape??], [batch_size] 
-def batch_generator_text(batch):
-    max_len = 0
-    for data in batch:
-        max_len = max(max_len, len(data[0]['input_ids'])) ##change
-    
-    for data in batch:
-        if len(data[0]['input_ids']) < max_len:
-            for key in data[0].keys():
-                data[0][key] = torch.nn.functional.pad(data[0][key], (0, max_len - len(data[0][key])))
-
-    keys = batch[0][0].keys()
-    texts = {}
-    for key in keys:
-        tensors = []
-        for data in batch:
-            tensors.append(data[0][key])
-        texts[key] = torch.stack(tensors, dim=0)
-    
-
-    return texts, torch.FloatTensor([b[1] for b in batch])
-
-def batch_generator_wav2vec(batch):
-    """max_chunks = 10000
-    for b in batch:
-        max_chunks = min(len(b[0]), max_chunks)
-    for i in range(len(batch)):
-        batch[i][0] = batch[i][0][:max_chunks]
-    x = torch.stack([torch.stack(b[0], dim=0) for b in batch], dim=0)
-    x = x.transpose(0, 1)
-    x = torch.split(x, 1)
-    x = [x.squeeze(0) for x in x]"""
-    return torch.stack([b[0] for b in batch], dim = 0), torch.FloatTensor([b[1] for b in batch])
-
-def batch_generator_multimodal(batch):
-    batch_text = [[b[0], b[2]] for b in batch]
-    batch_audio = [[b[1], b[2]] for b in batch]
-    text_tensor, _ = batch_generator_text(batch_text)
-    audio_tensor, labels = batch_generator_wav2vec(batch_audio)
-    return text_tensor, audio_tensor, labels
-
 def get_params_groups(model, optimizer_args):
+    """
+        Assigns at each sub-module of the model the initial learning rate defined in 'optimizer_args'.
+
+        Parameters
+        ----------
+        model: nn.Module
+        optimizer_args: dict
+    """
     params = []
     for name, module in model.named_modules():
         for i in range(len(optimizer_args['params'])):
@@ -54,6 +19,19 @@ def get_params_groups(model, optimizer_args):
     return params
 
 def get_model(cfg):
+    """
+        Creates and returns the model according to the configuration file
+
+        Parameters
+        ----------
+        cfg: yacs.config.CfgNode
+
+        Returns
+        -------
+        model: nn.Module
+            pytorch model created according to the config file in cfg
+    
+    """
     model = None
     model_name = cfg.MODEL.NAME
     models = []
@@ -61,7 +39,7 @@ def get_model(cfg):
         models.append(TextModel(
                             distilbert_type=cfg.MODEL.TEXT.DISTILBERT,
                             n_trainable_layers=cfg.MODEL.TEXT.N_TRAINABLE_LAYERS,
-                            p_list=cfg.MODEL.TEXT.DROPOUT_VALUES,
+                            dropout_values=cfg.MODEL.TEXT.DROPOUT_VALUES,
                             pre_classifier=cfg.MODEL.TEXT.PRE_CLASSIFIER,
                             classify=cfg.MODEL.TEXT.CLASSIFY
                         )
@@ -71,7 +49,7 @@ def get_model(cfg):
                             chunk_length=cfg.DATASET.CHUNK_LENGTH, 
                             n_transformers=cfg.MODEL.AUDIO.N_TRANSFORMERS,
                             n_trainable_layers=cfg.MODEL.AUDIO.N_TRAINABLE_LAYERS,
-                            p_list=cfg.MODEL.AUDIO.DROPOUT_VALUES,
+                            dropout_values=cfg.MODEL.AUDIO.DROPOUT_VALUES,
                             pre_classifier=cfg.MODEL.AUDIO.PRE_CLASSIFIER,
                             classify=cfg.MODEL.AUDIO.CLASSIFY
                         )
@@ -84,7 +62,7 @@ def get_model(cfg):
         model = MultimodalModel(
                         text_model=models[0],
                         audio_model=models[1],
-                        p_list=cfg.MODEL.MULTIMODAL.DROPOUT_VALUES,
+                        dropout_values=cfg.MODEL.MULTIMODAL.DROPOUT_VALUES,
                         freeze_text=cfg.MODEL.MULTIMODAL.FREEZE_TEXT,
                         freeze_audio=cfg.MODEL.MULTIMODAL.FREEZE_AUDIO
                     )

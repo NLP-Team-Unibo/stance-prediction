@@ -1,8 +1,6 @@
 import torch
 from torch import nn
 from models.stance_prediction_module import StancePredictionModule
-from models.text_model import TextModel
-from models.audio_model import AudioModel
 
 def freeze_model(model):
     for param in model.parameters():
@@ -13,7 +11,7 @@ class MultimodalModel(StancePredictionModule):
             self, 
             text_model, 
             audio_model, 
-            p_list = [0.3],
+            dropout_values = [0.3],
             freeze_text = False,
             freeze_audio = False,
         ):
@@ -24,8 +22,8 @@ class MultimodalModel(StancePredictionModule):
         if freeze_text: freeze_model(self.text_model)
         if freeze_audio: freeze_model(self.audio_model)
         
-        self.dropout = nn.Dropout(p=p_list[0])
-        self.classifier = nn.Linear(2*768, 1)
+        self.dropout = nn.Dropout(p=dropout_values[0])
+        self.classifier = nn.Linear(self.text_model.bert_out_dim + self.audio_model.wav2vec2_out_dim, 1)
     
     def forward(self, text_input, audio_input):
         x = self.text_model(**text_input)

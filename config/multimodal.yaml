@@ -2,7 +2,7 @@ DATASET:
   CHUNK_LENGTH: 15
   DATA_PATH: data/ibm_debater/full
   LOADER:
-    BATCH_SIZE: 4
+    BATCH_SIZE: 8
     DROP_LAST: true
     NUM_WORKERS: 0
   LOAD_AUDIO: true

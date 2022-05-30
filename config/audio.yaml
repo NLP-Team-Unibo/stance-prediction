@@ -18,24 +18,7 @@ MODEL:
     N_TRAINABLE_LAYERS: 4
     N_TRANSFORMERS: 4
     PRE_CLASSIFIER: true
-  MULTIMODAL:
-    AUDIO_CHECKPOINT_PATH: ''
-    DROPOUT_VALUES:
-    - 0.3
-    FREEZE_AUDIO: false
-    FREEZE_TEXT: false
-    LOAD_AUDIO_CHECKPOINT: false
-    LOAD_TEXT_CHECKPOINT: false
-    TEXT_CHECKPOINT_PATH: ''
   NAME: audio
-  TEXT:
-    CLASSIFY: true
-    DISTILBERT: distilbert-base-uncased
-    DROPOUT_VALUES:
-    - 0.3
-    - 0.3
-    N_TRAINABLE_LAYERS: 2
-    PRE_CLASSIFIER: true
 SETTINGS:
   DEVICE: cuda
 TRAIN:

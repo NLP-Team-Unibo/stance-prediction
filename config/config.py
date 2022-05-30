@@ -10,7 +10,7 @@ _C.DATASET.DATA_PATH = 'data/ibm_debater/full'
 _C.DATASET.LOAD_AUDIO = False
 _C.DATASET.LOAD_TEXT = True
 _C.DATASET.TOKENIZER = 'distilbert-base-uncased'
-_C.DATASET.CHUNK_LENGTH = 5
+_C.DATASET.CHUNK_LENGTH = 15
 _C.DATASET.SMALL_VERSION = False
 
 _C.DATASET.LOADER = CN()
@@ -29,8 +29,8 @@ _C.MODEL.TEXT.PRE_CLASSIFIER = True
 _C.MODEL.TEXT.DISTILBERT = 'distilbert-base-uncased'
 
 _C.MODEL.AUDIO = CN()
-_C.MODEL.AUDIO.N_TRANSFORMERS = 12
-_C.MODEL.AUDIO.N_TRAINABLE_LAYERS = 2
+_C.MODEL.AUDIO.N_TRANSFORMERS = 4
+_C.MODEL.AUDIO.N_TRAINABLE_LAYERS = 4
 _C.MODEL.AUDIO.CLASSIFY = False
 _C.MODEL.AUDIO.DROPOUT_VALUES = [0.3, 0.3]
 _C.MODEL.AUDIO.PRE_CLASSIFIER = True
@@ -59,10 +59,51 @@ _C.TRAIN.EARLY_STOPPING.PATIENCE = 3
 _C.TRAIN.EPOCHS = 20
 
 def get_cfg_defaults():
-  return _C.clone()
+    return _C.clone()
 
 def save_cfg_default():
-  with open('config/default.yaml', 'w') as f:
-    f.write(_C.dump())
-    f.flush()
-    f.close()
+    with open('config/default.yaml', 'w') as f:
+        f.write(_C.dump())
+        f.flush()
+        f.close()
+
+def save_cfg_text_default():
+    cfg = _C.clone()
+    with open('config/text.yaml', 'w') as f:
+        del cfg['MODEL']['AUDIO']
+        del cfg['MODEL']['MULTIMODAL']
+        f.write(cfg.dump())
+        f.flush()
+        f.close()
+
+def save_cfg_audio_default():
+    cfg = _C.clone()
+    cfg.DATASET.LOADER.BATCH_SIZE = 8
+    cfg.DATASET.LOAD_AUDIO = True
+    cfg.DATASET.LOAD_TEXT = False
+    cfg.MODEL.AUDIO.CLASSIFY = True
+    cfg.MODEL.NAME = 'audio'
+    with open('config/audio.yaml', 'w') as f:
+        del cfg['MODEL']['TEXT']
+        del cfg['MODEL']['MULTIMODAL']
+        f.write(cfg.dump())
+        f.flush()
+        f.close()
+
+def save_cfg_multimodal_default():
+    cfg = _C.clone()
+    cfg.DATASET.LOADER.BATCH_SIZE = 8
+    cfg.DATASET.LOAD_AUDIO = True
+    cfg.MODEL.NAME = 'multimodal'
+    cfg.MODEL.TEXT.CLASSIFY = False
+    cfg.MODEL.AUDIO.CLASSIFY = False
+    with open('config/multimodal.yaml', 'w') as f:
+        f.write(cfg.dump())
+        f.flush()
+        f.close()
+
+if __name__ == '__main__':
+    save_cfg_default()
+    save_cfg_text_default()
+    save_cfg_audio_default()
+    save_cfg_multimodal_default()

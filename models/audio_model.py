@@ -9,11 +9,10 @@ class AudioModel(StancePredictionModule):
         chunk_length=10, 
         n_transformers=12,
         n_trainable_layers=2,
-        p_list=(0.3, 0.3),
+        dropout_values=(0.3, 0.3),
         pre_classifier=True,
         classify=False
     ):
-
         super(AudioModel, self).__init__()
         assert n_transformers >= n_trainable_layers, 'Number of transformer layers must be greater or equal to the number of trainable layers'
         self.chunk_size = chunk_length
@@ -21,6 +20,8 @@ class AudioModel(StancePredictionModule):
         self.__bundle = torchaudio.pipelines.WAV2VEC2_BASE
         self.wav2vec2 = self.__bundle.get_model()
         self.wav2vec2.encoder.transformer.layers = self.wav2vec2.encoder.transformer.layers[:n_transformers]
+
+        self.wav2vec2_out_dim = self.wav2vec2.encoder.transformer.layers[-1].final_layer_norm.normalized_shape[0]
         
         for param in self.wav2vec2.parameters():
             param.requires_grad = False
@@ -29,14 +30,15 @@ class AudioModel(StancePredictionModule):
             for layer in self.wav2vec2.encoder.transformer.layers[-n_trainable_layers:]:
                 for param in layer.parameters():
                     param.requires_grad = True
-        self.dropout1 = nn.Dropout(p=p_list[0])
+
+        self.dropout1 = nn.Dropout(p=dropout_values[0])
         self.pre_classifier = pre_classifier
         if pre_classifier:
-            self.pre_classifier = nn.Linear(768, 768)
-            self.dropout2 = nn.Dropout(p=p_list[1])
+            self.pre_classifier = nn.Linear(self.wav2vec2_out_dim, self.wav2vec2_out_dim)
+            self.dropout2 = nn.Dropout(p=dropout_values[1])
         self.relu = nn.ReLU()
         if classify:
-            self.classifier= nn.Linear(768, 1)
+            self.classifier= nn.Linear(self.wav2vec2_out_dim, 1)
         
     
     def forward(self, audio):
@@ -50,3 +52,5 @@ class AudioModel(StancePredictionModule):
         if self.classify:
             x = self.classifier(x)
         return x
+
+a = AudioModel()

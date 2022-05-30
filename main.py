@@ -1,18 +1,22 @@
+import numpy as np
 from argparse import ArgumentParser
+
+import torch
 import torchtext
+from torch import nn, optim
 from torch.utils.data import DataLoader, random_split
+
 import transformers
 from transformers import DistilBertTokenizer
-from ibm_dataset import IBMDebater
-import utils
-from train_text import train_loop
-from transformers import DistilBertTokenizer
-import torch
-import numpy as np
-from torch import nn, optim
-from early_stopping import EarlyStopping
-from train import train_loop
+
 from config import config
+from train import train_loop
+from ibm_dataset import IBMDebater
+
+from utils.train import *
+from utils.early_stopping import *
+from utils.batch_generators import *
+
 transformers.logging.set_verbosity_error()
 
 
@@ -53,11 +57,11 @@ def train_pipeline(args):
         data_train, data_val = random_split(data, [train_len, len(data) - train_len])
 
     if model_name == 'text':
-        collate_fn = utils.batch_generator_text
+        collate_fn = batch_generator_text
     elif model_name == 'audio':
-        collate_fn = utils.batch_generator_wav2vec
+        collate_fn = batch_generator_wav2vec
     else:
-        collate_fn = utils.batch_generator_multimodal
+        collate_fn = batch_generator_multimodal
 
     batch_size = cfg.DATASET.LOADER.BATCH_SIZE
     drop_last = cfg.DATASET.LOADER.DROP_LAST
@@ -75,7 +79,7 @@ def train_pipeline(args):
                         drop_last=drop_last,
                         num_workers=num_workers)
 
-    model = utils.get_model(cfg)
+    model = get_model(cfg)
 
     optimizer = cfg.TRAIN.OPTIMIZER
     optimizer_args = cfg.TRAIN.OPTIMIZER_ARGS
@@ -85,7 +89,7 @@ def train_pipeline(args):
     epochs = cfg.TRAIN.EPOCHS
     params = [{'params': model.parameters(), 'lr':lr}]
     if len(optimizer_args) > 0:
-        params = utils.get_params_groups(model, optimizer_args)
+        params = get_params_groups(model, optimizer_args)
     if optimizer == 'adam':
         optimizer = optim.Adam(params, lr=lr)
     if len(scheduler) > 0:

@@ -1,17 +1,22 @@
+from tqdm import tqdm
 from argparse import ArgumentParser
-from torchinfo import summary
+
+import torch
 import torchtext
+from torchinfo import summary
 from torch.utils.data import DataLoader
+
 import transformers
 from transformers import DistilBertTokenizer
-from ibm_dataset import IBMDebater
-import utils
-from transformers import DistilBertTokenizer
-import torch
-from tqdm import tqdm
-from config import config
-transformers.logging.set_verbosity_error()
 
+from ibm_dataset import IBMDebater
+from config import config
+
+from utils.train import *
+from utils.early_stopping import *
+from utils.batch_generators import *
+
+transformers.logging.set_verbosity_error()
 
 def evaluate_pipeline(args):
     checkpoint_path = args.checkpoint_path
@@ -22,7 +27,7 @@ def evaluate_pipeline(args):
     cfg.freeze()
 
     state_dict = torch.load(checkpoint_path, device)
-    model = utils.get_model(cfg)
+    model = get_model(cfg)
     model.load_state_dict(state_dict)
     if device == 'cuda':
         model.cuda()
@@ -45,11 +50,11 @@ def evaluate_pipeline(args):
     
     model_name = cfg.MODEL.NAME
     if model_name == 'text':
-        collate_fn = utils.batch_generator_text
+        collate_fn = batch_generator_text
     elif model_name == 'audio':
-        collate_fn = utils.batch_generator_wav2vec
+        collate_fn = batch_generator_wav2vec
     else:
-        collate_fn = utils.batch_generator_multimodal
+        collate_fn = batch_generator_multimodal
 
     batch_size = cfg.DATASET.LOADER.BATCH_SIZE
     num_workers = cfg.DATASET.LOADER.NUM_WORKERS

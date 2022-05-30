@@ -2,7 +2,7 @@ from torch import optim
 from torch import nn
 import torch
 from tqdm import tqdm
-from early_stopping import EarlyStopping
+from utils.early_stopping import EarlyStopping
 from torch.utils.tensorboard import SummaryWriter
 def train_loop(
         model, 
@@ -31,6 +31,7 @@ def train_loop(
         writer.add_scalar('Val accuracy', val_results['val_accuracy'], i)
         if early_stopping:
             if early_stopping(val_results['val_accuracy']):
+                print('Early stopping triggered, best score: ', early_stopping.best_score)
                 model.load_state_dict(early_stopping.best_weights)
                 break
         if step_lr:

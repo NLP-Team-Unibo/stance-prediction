@@ -10,23 +10,6 @@ DATASET:
   SMALL_VERSION: false
   TOKENIZER: distilbert-base-uncased
 MODEL:
-  AUDIO:
-    CLASSIFY: false
-    DROPOUT_VALUES:
-    - 0.3
-    - 0.3
-    N_TRAINABLE_LAYERS: 4
-    N_TRANSFORMERS: 4
-    PRE_CLASSIFIER: true
-  MULTIMODAL:
-    AUDIO_CHECKPOINT_PATH: ''
-    DROPOUT_VALUES:
-    - 0.3
-    FREEZE_AUDIO: false
-    FREEZE_TEXT: false
-    LOAD_AUDIO_CHECKPOINT: false
-    LOAD_TEXT_CHECKPOINT: false
-    TEXT_CHECKPOINT_PATH: ''
   NAME: text
   TEXT:
     CLASSIFY: true

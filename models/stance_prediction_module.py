@@ -1,10 +1,8 @@
-
 import torch
 from torch import nn
 import os
 
 class StancePredictionModule(nn.Module):
-
     def __init__(self):
         super(StancePredictionModule, self).__init__()
     

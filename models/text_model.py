@@ -7,12 +7,13 @@ class TextModel(StancePredictionModule):
         self, 
         distilbert_type='distilbert-base-uncased',
         n_trainable_layers=2,
-        p_list=(0.3, 0.3),
+        dropout_values=(0.3, 0.3),
         pre_classifier=True,
         classify=False
     ):
         super(TextModel, self).__init__()
         self.bert = DistilBertModel.from_pretrained(distilbert_type)
+        self.bert_out_dim = self.bert.transformer.layer[-1].output_layer_norm.normalized_shape[0]
         self.classify=classify
         for param in self.bert.parameters():
             param.requires_grad = False
@@ -20,14 +21,15 @@ class TextModel(StancePredictionModule):
             for layer in self.bert.transformer.layer[-n_trainable_layers:]:
                 for param in layer.parameters():
                     param.requires_grad = True
-        self.dropout1 = nn.Dropout(p=p_list[0])
+        
+        self.dropout1 = nn.Dropout(p=dropout_values[0])
         self.pre_classifier = pre_classifier
         if pre_classifier:
-            self.pre_classifier = nn.Linear(768, 768)
-            self.dropout2 = nn.Dropout(p=p_list[1])
+            self.pre_classifier = nn.Linear(self.bert_out_dim, self.bert_out_dim)
+            self.dropout2 = nn.Dropout(p=dropout_values[1])
         self.relu = nn.ReLU()
         if classify:
-            self.classifier= nn.Linear(768, 1)
+            self.classifier= nn.Linear(self.bert_out_dim, 1)
             
     
     def forward(self, input_ids, attention_mask):

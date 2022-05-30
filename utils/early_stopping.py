@@ -7,7 +7,7 @@ class EarlyStopping:
         self.patience = patience+1
         self.lower_is_better = lower_is_better
         self.best_score = -float("inf")
-        self.k = self.patience
+        self.remaining_patience = self.patience
         self.best_weights = None
     
     def __call__(self, score: float) -> bool:
@@ -17,7 +17,7 @@ class EarlyStopping:
             self.best_score = score
             self.best_weights = copy.deepcopy(self.model.state_dict())
         else:
-            self.k -= 1
-            if self.k == 0:
+            self.remaining_patience -= 1
+            if self.remaining_patience == 0:
                 return True
         return False
