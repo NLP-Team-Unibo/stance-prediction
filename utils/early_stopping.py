@@ -40,7 +40,7 @@ class EarlyStopping:
         score = -score if self.lower_is_better else score
         outcome = False
         if score > self.best_score:
-            self.k = self.patience
+            self.remaining_patience = self.patience
             self.best_score = score
             self.best_weights = copy.deepcopy(self.model.state_dict())
         else:

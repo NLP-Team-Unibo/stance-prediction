@@ -4,7 +4,7 @@ DATASET:
   LOADER:
     BATCH_SIZE: 8
     DROP_LAST: true
-    NUM_WORKERS: 4
+    NUM_WORKERS: 0
   LOAD_AUDIO: true
   LOAD_TEXT: false
   SMALL_VERSION: false
