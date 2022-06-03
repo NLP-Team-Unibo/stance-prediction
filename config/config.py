@@ -59,15 +59,21 @@ _C.TRAIN.EARLY_STOPPING.PATIENCE = 3
 _C.TRAIN.EPOCHS = 20
 
 def get_cfg_defaults():
+    """
+    Returns a clone of the yacs CfgNode object with default values for the project, so that the original defaults 
+    will not be altered.
+    """
     return _C.clone()
 
 def save_cfg_default():
+    """Save in a YAML file the default version of the configuration file, in order to provide a template to be modified."""
     with open('config/default.yaml', 'w') as f:
         f.write(_C.dump())
         f.flush()
         f.close()
 
 def save_cfg_text_default():
+    """Save in a YAML file a template configuration file for training the TextModel."""
     cfg = _C.clone()
     with open('config/text.yaml', 'w') as f:
         del cfg['MODEL']['AUDIO']
@@ -77,6 +83,7 @@ def save_cfg_text_default():
         f.close()
 
 def save_cfg_audio_default():
+    """Save in a YAML file a template configuration file for training the AudioModel."""
     cfg = _C.clone()
     cfg.DATASET.LOADER.BATCH_SIZE = 8
     cfg.DATASET.LOAD_AUDIO = True
@@ -91,6 +98,7 @@ def save_cfg_audio_default():
         f.close()
 
 def save_cfg_multimodal_default():
+    """Save in a YAML file a template configuration file for training the MultimodalModel."""
     cfg = _C.clone()
     cfg.DATASET.LOADER.BATCH_SIZE = 8
     cfg.DATASET.LOAD_AUDIO = True
@@ -103,6 +111,7 @@ def save_cfg_multimodal_default():
         f.close()
 
 if __name__ == '__main__':
+    """Automatically save the template version of the config files when config.py is executed as a script."""
     save_cfg_default()
     save_cfg_text_default()
     save_cfg_audio_default()

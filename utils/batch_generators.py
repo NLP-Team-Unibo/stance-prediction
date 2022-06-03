@@ -8,8 +8,15 @@ def batch_generator_text(batch):
         Parameters
         ----------
         batch: list of tuples
-            where each tuple contains (input_example, label), with input_example that is a dictionary of type 
+            Where each tuple contains (input_example, label), with input_example that is a dictionary of type 
             {'input_ids': [], 'attention_mask': []} and label that is the corresponding label id.
+        
+        Returns
+        ----------
+        results: tuple
+            A tuple containing:
+                - A dictionary containg, for each key, a batch tensor representing the input.
+                - A tensor containing the labels of the batch.
     """
     max_len = 0
 
@@ -36,8 +43,15 @@ def batch_generator_wav2vec(batch):
         Parameters
         ----------
         batch: list of tuple
-            where each tuple is of the type (input_example, label), with input_example which is already a tensor and 
+            Where each tuple is of the type (input_example, label), with input_example which is already a tensor and 
             label which is the corresponding label id.
+
+        Returns
+        ----------
+        results: tuple
+            A tuple containing:
+                - A tensor containing the input of the batch.
+                - A tensor containing the labels of the batch.
     """
     return torch.stack([b[0] for b in batch], dim = 0), torch.FloatTensor([b[1] for b in batch])
 
@@ -48,8 +62,16 @@ def batch_generator_multimodal(batch):
         Parameters
         ----------
         batch: list of tuple
-            where each tuple is of the type (text_input, audio_input, label), with text_input a dictionary of the form {'input_ids': [], 'attention_mask': []},
+            Where each tuple is of the type (text_input, audio_input, label), with text_input a dictionary of the form {'input_ids': [], 'attention_mask': []},
             audio_input a tensor and label the corresponding label id
+        
+        Returns
+        ----------
+        results: tuple
+            A tuple containing:
+                - A tensor containing the text input of the batch.
+                - A tensor containing the audio input of the batch.
+                - A tensor containing the labels of the batch.
     """
     batch_text = [[b[0], b[2]] for b in batch]
     batch_audio = [[b[1], b[2]] for b in batch]

@@ -1,5 +1,5 @@
-from models.audio_model import AudioModel
 from models.text_model import TextModel
+from models.audio_model import AudioModel
 from models.multimodal_model import MultimodalModel
 
 def get_params_groups(model, optimizer_args):
@@ -10,6 +10,13 @@ def get_params_groups(model, optimizer_args):
         ----------
         model: nn.Module
         optimizer_args: dict
+
+        Returns
+        -------
+        params: list of dict
+            A list containing dictionaries having two keys:
+                'params': the parameters of the module;
+                'lr': the learning rate associated with the above parameters.
     """
     params = []
     for name, module in model.named_modules():
@@ -29,7 +36,7 @@ def get_model(cfg):
         Returns
         -------
         model: nn.Module
-            pytorch model created according to the config file in cfg
+            Pytorch model created according to the config file in cfg
     
     """
     model = None
@@ -46,7 +53,6 @@ def get_model(cfg):
                     )
     if model_name == 'audio' or model_name == 'multimodal':
         models.append(AudioModel(
-                            chunk_length=cfg.DATASET.CHUNK_LENGTH, 
                             n_transformers=cfg.MODEL.AUDIO.N_TRANSFORMERS,
                             n_trainable_layers=cfg.MODEL.AUDIO.N_TRAINABLE_LAYERS,
                             dropout_values=cfg.MODEL.AUDIO.DROPOUT_VALUES,

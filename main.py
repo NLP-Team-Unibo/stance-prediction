@@ -21,6 +21,14 @@ transformers.logging.set_verbosity_error()
 
 
 def train_pipeline(args):
+    """
+        This function excecute the training pipeline according to the configuration file. In particular it excecutes the following tasks:
+            - pre-processing: defines how raw data will be transformed in order to make it suitable for training the model;
+            - data splitting: splits the dataset into train and validation;
+            - data loading: splits the data in batches;
+            - model definition: define the model according to the configuration file.
+            - training: excecute the training procedure.
+    """
     cfg_path = args.cfg_path
 
     cfg = config.get_cfg_defaults()
@@ -36,17 +44,19 @@ def train_pipeline(args):
     text_transform = torchtext.transforms.ToTensor()
     tokenizer = DistilBertTokenizer.from_pretrained(cfg.DATASET.TOKENIZER)
 
-
+    # Define how the data will be pre-processed by calling IBMDebater
     data = IBMDebater(data_path, 
                     split='train', 
                     tokenizer=tokenizer, 
-                    max_audio_len=chunk_length, 
+                    chunk_length=chunk_length, 
                     text_transform=text_transform,
                     load_audio=load_audio,
                     load_text=load_text)
 
     train_len = int(len(data)*0.7)
 
+    # Splits the whole dataset into train and validation.
+    # If specified, use just a small subset of the original dataset.
     if cfg.DATASET.SMALL_VERSION:
         small_data_dim = 0.2
         rnd_idx = np.random.choice(np.array([i for i in range(1, len(data))]), size=int(len(data)*small_data_dim))
@@ -56,6 +66,7 @@ def train_pipeline(args):
     else:
         data_train, data_val = random_split(data, [train_len, len(data) - train_len])
 
+    # Specify the batch collate function according to the type of model
     if model_name == 'text':
         collate_fn = batch_generator_text
     elif model_name == 'audio':
@@ -63,6 +74,7 @@ def train_pipeline(args):
     else:
         collate_fn = batch_generator_multimodal
 
+    # Data loading task: prepare the data loaders, in order to split the data in batches
     batch_size = cfg.DATASET.LOADER.BATCH_SIZE
     drop_last = cfg.DATASET.LOADER.DROP_LAST
     num_workers = cfg.DATASET.LOADER.NUM_WORKERS
@@ -79,8 +91,10 @@ def train_pipeline(args):
                         drop_last=drop_last,
                         num_workers=num_workers)
 
+    # Get the model accoriding to the configuration file
     model = get_model(cfg)
 
+    # Set up optimizer, scheduler and other training loop parameters/utils according to the configuration file
     optimizer = cfg.TRAIN.OPTIMIZER
     optimizer_args = cfg.TRAIN.OPTIMIZER_ARGS
     scheduler = cfg.TRAIN.LR_SCHEDULER
@@ -96,9 +110,9 @@ def train_pipeline(args):
         scheduler = optim.lr_scheduler.StepLR(optimizer, **scheduler)
     early_stopping = EarlyStopping(model, patience=early_stopping.PATIENCE)
     criterion = nn.BCEWithLogitsLoss()
-
+    
+    # Start train loop and save checkpoints at the end if the configuration file specifies it
     train_loop(model, optimizer, criterion, early_stopping, loader_train, loader_val, epochs, device, step_lr=scheduler, cfg=cfg)
-
     if cfg.TRAIN.SAVE_CHECKPOINT:
         path = cfg.TRAIN.CHECKPOINT_PATH
         model.save_backbone(path)

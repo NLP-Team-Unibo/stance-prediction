@@ -9,8 +9,8 @@ from torch.utils.data import DataLoader
 import transformers
 from transformers import DistilBertTokenizer
 
-from ibm_dataset import IBMDebater
 from config import config
+from ibm_dataset import IBMDebater
 
 from utils.train import *
 from utils.early_stopping import *
@@ -19,6 +19,13 @@ from utils.batch_generators import *
 transformers.logging.set_verbosity_error()
 
 def evaluate_pipeline(args):
+    """
+        This function excecute the evaluation pipeline according to the configuration file. In particular it excecutes the following tasks:
+            - pre-processing: defines how raw data will be transformed in order to make it suitable for evaluate the model;
+            - data loading: splits the data in batches;
+            - model loading: define and load the model checkpoint according to the configuration file.
+            - evaluating: excecute the evaluation procedure.
+    """
     checkpoint_path = args.checkpoint_path
     cfg_path = args.cfg_path
     device = args.device
@@ -26,12 +33,6 @@ def evaluate_pipeline(args):
     cfg.merge_from_file(cfg_path)
     cfg.freeze()
 
-    state_dict = torch.load(checkpoint_path, device)
-    model = get_model(cfg)
-    model.load_state_dict(state_dict)
-    if device == 'cuda':
-        model.cuda()
-    summary(model)
 
     data_path = cfg.DATASET.DATA_PATH
     load_audio = cfg.DATASET.LOAD_AUDIO
@@ -40,15 +41,18 @@ def evaluate_pipeline(args):
     text_transform = torchtext.transforms.ToTensor()
     tokenizer = DistilBertTokenizer.from_pretrained(cfg.DATASET.TOKENIZER)
 
+    # Define how the data will be pre-processed by calling IBMDebater
     data_test = IBMDebater(data_path, 
                     split='test', 
                     tokenizer=tokenizer, 
-                    max_audio_len=chunk_length, 
+                    chunk_length=chunk_length, 
                     text_transform=text_transform,
                     load_audio=load_audio,
                     load_text=load_text)
     
     model_name = cfg.MODEL.NAME
+
+    # Specify the batch collate function according to the type of model
     if model_name == 'text':
         collate_fn = batch_generator_text
     elif model_name == 'audio':
@@ -56,6 +60,7 @@ def evaluate_pipeline(args):
     else:
         collate_fn = batch_generator_multimodal
 
+    # Data loading task: prepare the data loader, in order to split the data in batches
     batch_size = cfg.DATASET.LOADER.BATCH_SIZE
     num_workers = cfg.DATASET.LOADER.NUM_WORKERS
     loader_test = DataLoader(data_test,
@@ -64,14 +69,38 @@ def evaluate_pipeline(args):
                         collate_fn=collate_fn,
                         drop_last=False,
                         num_workers=num_workers)
+
+    # Model loading: define the model and load its checkpoint, according to the cfg file
+    state_dict = torch.load(checkpoint_path, device)
+    model = get_model(cfg)
+    model.load_state_dict(state_dict)
+    if device == 'cuda':
+        model.cuda()
+    summary(model)
+
+    # Starts the evaluation procedure
     evaluate(model, loader_test, device)
 
 def evaluate(model, data_loader, device):
+    """
+        This function excecute a single evaluation step.
+
+        Parameters
+        ----------
+        model: models.StancePredictionModule
+            The stance prediction model to be evaluate.
+        data_loader: torch.utils.data.DataLoader
+            The data loader of the test dataset.
+        device: str
+            The name of the device where to excecute the evaluation procedure.       
+        Returns
+        ----------
+        results: dict
+    """
     model.eval()
     with torch.no_grad():
         total_acc = 0.0
         total = 0
-        results = {}
         model_name = model.__class__.__name__
         for data in tqdm(data_loader):
             if model_name == 'TextModel':
@@ -95,7 +124,6 @@ def evaluate(model, data_loader, device):
             acc = ((output > 0).float() == labels).sum().item()
             total_acc += acc
         print('test_accuracy:', total_acc / total)
-    return results
 
     
 
@@ -106,5 +134,3 @@ if __name__ == '__main__':
     args.add_argument('--device', '-d', default='cuda', help='Device name, default is \"cuda\"')
     args = args.parse_args()
     evaluate_pipeline(args)
-
-
