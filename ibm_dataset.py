@@ -1,4 +1,5 @@
 import os
+import ast
 import librosa
 import pandas as pd
 
@@ -62,11 +63,11 @@ class IBMDebater(Dataset):
         # Some audio files do not have a corresponding element in the csv files. Since we found that these discrepancies
         # were most probably due to spelling mistakes, we choose to re-name the annotations on the fly according to the
         # mappings shown in the file wav_corrections.txt
-        if split == 'train':
+        if split == 'train' or split == 'validation':
             with open('wav_corrections.txt', 'r') as f:
-                corr = f.read().splitlines()
-            for c in corr:
-                c = c.split(' ')
+                data = f.read()
+            corrections = ast.literal_eval(data)
+            for c in corrections[split]:
                 self.annotations['wav-file-name'].replace(c[0], c[1], inplace=True)
                 assert c[1] in self.annotations['wav-file-name'].values
                 assert c[0] not in self.annotations['wav-file-name'].values

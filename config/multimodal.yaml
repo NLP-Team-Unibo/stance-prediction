@@ -3,7 +3,7 @@ DATASET:
   DATA_PATH: data/ibm_debater/full
   LOADER:
     BATCH_SIZE: 8
-    DROP_LAST: true
+    DROP_LAST: false
     NUM_WORKERS: 0
   LOAD_AUDIO: true
   LOAD_TEXT: true

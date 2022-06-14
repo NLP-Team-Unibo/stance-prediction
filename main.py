@@ -45,26 +45,30 @@ def train_pipeline(args):
     tokenizer = DistilBertTokenizer.from_pretrained(cfg.DATASET.TOKENIZER)
 
     # Define how the data will be pre-processed by calling IBMDebater
-    data = IBMDebater(data_path, 
+    data_train = IBMDebater(data_path, 
                     split='train', 
                     tokenizer=tokenizer, 
                     chunk_length=chunk_length, 
                     text_transform=text_transform,
                     load_audio=load_audio,
                     load_text=load_text)
-
-    train_len = int(len(data)*0.7)
+    data_val = IBMDebater(data_path, 
+                    split='validation', 
+                    tokenizer=tokenizer, 
+                    chunk_length=chunk_length, 
+                    text_transform=text_transform,
+                    load_audio=load_audio,
+                    load_text=load_text)
 
     # Splits the whole dataset into train and validation.
     # If specified, use just a small subset of the original dataset.
     if cfg.DATASET.SMALL_VERSION:
         small_data_dim = 0.2
-        rnd_idx = np.random.choice(np.array([i for i in range(1, len(data))]), size=int(len(data)*small_data_dim))
-        small_data = torch.utils.data.Subset(data, rnd_idx)
-        train_len = int(len(small_data)*0.7) 
-        data_train, data_val = random_split(small_data, [train_len, len(small_data) - train_len])
-    else:
-        data_train, data_val = random_split(data, [train_len, len(data) - train_len])
+        rnd_idx = np.random.choice(np.array([i for i in range(1, len(data_train))]), size=int(len(data_train)*small_data_dim))
+        data_train = torch.utils.data.Subset(data_train, rnd_idx)
+
+        rnd_idx = np.random.choice(np.array([i for i in range(1, len(data_val))]), size=int(len(data_val)*small_data_dim))
+        data_val = torch.utils.data.Subset(data_val, rnd_idx)
 
     # Specify the batch collate function according to the type of model
     if model_name == 'text':
@@ -88,7 +92,7 @@ def train_pipeline(args):
                         batch_size=batch_size,
                         shuffle=False,
                         collate_fn=collate_fn,
-                        drop_last=drop_last,
+                        drop_last=False,
                         num_workers=num_workers)
 
     # Get the model accoriding to the configuration file

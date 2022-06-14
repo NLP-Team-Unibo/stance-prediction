@@ -1,3 +1,4 @@
+import os
 from tqdm import tqdm
 from argparse import ArgumentParser
 
@@ -16,8 +17,6 @@ from utils.train import *
 from utils.early_stopping import *
 from utils.batch_generators import *
 from sklearn.metrics import ConfusionMatrixDisplay, classification_report
-
-import os
 
 transformers.logging.set_verbosity_error()
 

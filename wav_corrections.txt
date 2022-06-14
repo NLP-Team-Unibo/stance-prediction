@@ -1,2 +1,9 @@
-TL_3634_background-check_con.wav TL_3634_background-checks_con.wav
-RG_2227_whaling_con_TL_explicit.wav RG_2227_ban-whaling_con_TL_explicit.wav
+{"train": [
+        ("TL_3634_background-check_con.wav", "TL_3634_background-checks_con.wav"),
+        ("RG_2227_whaling_con_TL_explicit.wav", "RG_2227_ban-whaling_con_TL_explicit.wav")
+    ],
+"validation": [
+        ("HE_4564_motorcycle-helmets_con.wav", "HE_4564_motorcyle-helmets_con.wav"), 
+        ("TL_4354_iraq-war_con.wav", "TL_4354_criticism-iraq-war_con.wav")
+    ]
+}
