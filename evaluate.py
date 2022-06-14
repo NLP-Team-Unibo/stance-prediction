@@ -15,6 +15,9 @@ from ibm_dataset import IBMDebater
 from utils.train import *
 from utils.early_stopping import *
 from utils.batch_generators import *
+from sklearn.metrics import ConfusionMatrixDisplay, classification_report
+
+import os
 
 transformers.logging.set_verbosity_error()
 
@@ -79,7 +82,14 @@ def evaluate_pipeline(args):
     summary(model)
 
     # Starts the evaluation procedure
-    evaluate(model, loader_test, device)
+    y_pred, y_true = evaluate(model, loader_test, device)
+    y_pred, y_true = y_pred.cpu().numpy(), y_true.cpu().numpy()
+    import matplotlib.pyplot as plt
+    _, ax = plt.subplots()
+    disp = ConfusionMatrixDisplay.from_predictions(y_true, y_pred, display_labels=['con', 'pro'], ax=ax, cmap=plt.cm.Blues, normalize='true')
+    print(classification_report(y_true, y_pred, target_names=['con', 'pro']))
+    os.makedirs('images/', exist_ok=True)
+    plt.savefig(f'images/{ cfg_path.split("/")[-1].replace(".yaml", ".png")}')
 
 def evaluate(model, data_loader, device):
     """
@@ -102,6 +112,9 @@ def evaluate(model, data_loader, device):
         total_acc = 0.0
         total = 0
         model_name = model.__class__.__name__
+
+        y_pred = []
+        y_true = []
         for data in tqdm(data_loader):
             if model_name == 'TextModel':
                 input_dict = data[0]
@@ -121,9 +134,14 @@ def evaluate(model, data_loader, device):
             output = output.squeeze(1)
 
             total += labels.size(0)
-            acc = ((output > 0).float() == labels).sum().item()
+            
+            pred = (output > 0).float()
+            y_pred.append(pred)
+            y_true.append(labels)
+            acc = (pred == labels).sum().item()
             total_acc += acc
         print('test_accuracy:', total_acc / total)
+    return torch.cat(y_pred), torch.cat(y_true)
 
     
 
