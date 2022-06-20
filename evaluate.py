@@ -79,16 +79,21 @@ def evaluate_pipeline(args):
     if device == 'cuda':
         model.cuda()
     summary(model)
-
+	
     # Starts the evaluation procedure
     y_pred, y_true = evaluate(model, loader_test, device)
     y_pred, y_true = y_pred.cpu().numpy(), y_true.cpu().numpy()
+    
+    mask = ~(y_pred == y_true)
+    os.makedirs('wrongs/' + model_name, exist_ok=True)
+    data_test.annotations['speech-id'][mask].to_csv(f'wrongs/{model_name}/{cfg_path.split("/")[-1].replace(".yaml", ".csv")}')
+    
     import matplotlib.pyplot as plt
     _, ax = plt.subplots()
     disp = ConfusionMatrixDisplay.from_predictions(y_true, y_pred, display_labels=['con', 'pro'], ax=ax, cmap=plt.cm.Blues, normalize='true')
     print(classification_report(y_true, y_pred, target_names=['con', 'pro']))
-    os.makedirs('images/', exist_ok=True)
-    plt.savefig(f'images/{ cfg_path.split("/")[-1].replace(".yaml", ".png")}')
+    os.makedirs('images/'+ model_name, exist_ok=True)
+    plt.savefig(f'images/{model_name}/{cfg_path.split("/")[-1].replace(".yaml", ".png")}')
 
 def evaluate(model, data_loader, device):
     """
