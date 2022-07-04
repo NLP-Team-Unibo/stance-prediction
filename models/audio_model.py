@@ -11,7 +11,8 @@ class AudioModel(StancePredictionModule):
         n_trainable_layers=2,
         dropout_values=(0.3, 0.3),
         pre_classifier=True,
-        classify=False
+        classify=False,
+        return_sequences=False
     ):
         """
             Creates the model for the speech classification task. It relies on Wav2Vec2-BASE for the feature extraction and encoding part of the raw signal, 
@@ -32,12 +33,14 @@ class AudioModel(StancePredictionModule):
                 False only when the AudioModel is used as a component in the bigger MultimodalModel. Default to False.
             
         """
+
         super(AudioModel, self).__init__()
         assert n_transformers >= n_trainable_layers, 'Number of transformer layers must be greater or equal to the number of trainable layers'
         assert 1 <= n_transformers <= 12, 'Number of transformer layers must be between 1 and 12'
         self.classify = classify
         self.__bundle = torchaudio.pipelines.WAV2VEC2_BASE
         self.wav2vec2 = self.__bundle.get_model()
+        self.return_sequences = return_sequences
 
         # Keeping only the first n_transformers
         self.wav2vec2.encoder.transformer.layers = self.wav2vec2.encoder.transformer.layers[:n_transformers]
@@ -52,20 +55,23 @@ class AudioModel(StancePredictionModule):
                 for param in layer.parameters():
                     param.requires_grad = True
 
-        # Defining the classification heads
-        self.dropout1 = nn.Dropout(p=dropout_values[0])
-        self.pre_classifier = pre_classifier
-        if pre_classifier:
-            self.pre_classifier = nn.Linear(self.wav2vec2_out_dim, self.wav2vec2_out_dim)
-            self.dropout2 = nn.Dropout(p=dropout_values[1])
-        self.relu = nn.ReLU()
-        if classify:
-            self.classifier= nn.Linear(self.wav2vec2_out_dim, 1)
+        if not self.return_sequences:
+            # Defining the classification heads
+            self.dropout1 = nn.Dropout(p=dropout_values[0])
+            self.pre_classifier = pre_classifier
+            if pre_classifier:
+                self.pre_classifier = nn.Linear(self.wav2vec2_out_dim, self.wav2vec2_out_dim)
+                self.dropout2 = nn.Dropout(p=dropout_values[1])
+            self.relu = nn.ReLU()
+            if classify:
+                self.classifier= nn.Linear(self.wav2vec2_out_dim, 1)
         
     
     def forward(self, audio):
         # Feature extraction + encoding
         x, _ = self.wav2vec2(audio)
+        if self.return_sequences:
+            return x
         # Temporal average
         x = torch.mean(x, dim=1)
 

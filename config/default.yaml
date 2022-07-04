@@ -26,6 +26,7 @@ MODEL:
     FREEZE_TEXT: false
     LOAD_AUDIO_CHECKPOINT: false
     LOAD_TEXT_CHECKPOINT: false
+    NEW: true
     TEXT_CHECKPOINT_PATH: ''
   NAME: text
   TEXT:

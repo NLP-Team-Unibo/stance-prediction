@@ -9,7 +9,8 @@ class TextModel(StancePredictionModule):
         n_trainable_layers=2,
         dropout_values=(0.3, 0.3),
         pre_classifier=True,
-        classify=False
+        classify=False,
+        return_sequences=False
     ):
         """
             Creates the desired model for the text classification task. It is based on the huggingface implementation of DistilBert, which can then
@@ -39,6 +40,7 @@ class TextModel(StancePredictionModule):
         self.bert_out_dim = self.bert.transformer.layer[-1].output_layer_norm.normalized_shape[0]
         self.classify = classify
         self.pre_classifier = pre_classifier
+        self.return_sequences = return_sequences
 
         # Make all the DistilBert parameters non-trainable
         for param in self.bert.parameters():
@@ -50,21 +52,25 @@ class TextModel(StancePredictionModule):
                 for param in layer.parameters():
                     param.requires_grad = True
         
-        self.dropout1 = nn.Dropout(p=dropout_values[0])
-        self.relu = nn.ReLU()
+        
 
-        if pre_classifier:
-            self.pre_classifier = nn.Linear(self.bert_out_dim, self.bert_out_dim)
-            self.dropout2 = nn.Dropout(p=dropout_values[1])
-    
-        if classify:
-            self.classifier= nn.Linear(self.bert_out_dim, 1)
+        if not self.return_sequences:
+            self.dropout1 = nn.Dropout(p=dropout_values[0])
+            self.relu = nn.ReLU()
+            if pre_classifier:
+                self.pre_classifier = nn.Linear(self.bert_out_dim, self.bert_out_dim)
+                self.dropout2 = nn.Dropout(p=dropout_values[1])
+        
+            if classify:
+                self.classifier= nn.Linear(self.bert_out_dim, 1)
             
     
     def forward(self, input_ids, attention_mask):
         x = self.bert(input_ids=input_ids, attention_mask=attention_mask)
 
         # DistilBert returns a sequence but we are only interested in working with the first element.
+        if self.return_sequences:
+            return x[0]
         x = x[0][:, 0]
 
         # Classification

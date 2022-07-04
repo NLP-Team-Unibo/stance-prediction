@@ -1,6 +1,6 @@
 from models.text_model import TextModel
 from models.audio_model import AudioModel
-from models.multimodal_model import MultimodalModel
+from models.multimodal_model import MultimodalModel, MultimodalModelMulT
 
 def get_params_groups(model, optimizer_args):
     """
@@ -48,7 +48,8 @@ def get_model(cfg):
                             n_trainable_layers=cfg.MODEL.TEXT.N_TRAINABLE_LAYERS,
                             dropout_values=cfg.MODEL.TEXT.DROPOUT_VALUES,
                             pre_classifier=cfg.MODEL.TEXT.PRE_CLASSIFIER,
-                            classify=cfg.MODEL.TEXT.CLASSIFY
+                            classify=cfg.MODEL.TEXT.CLASSIFY,
+                            return_sequences=cfg.MODEL.MULTIMODAL.NEW and model_name == 'multimodal'
                         )
                     )
     if model_name == 'audio' or model_name == 'multimodal':
@@ -57,21 +58,33 @@ def get_model(cfg):
                             n_trainable_layers=cfg.MODEL.AUDIO.N_TRAINABLE_LAYERS,
                             dropout_values=cfg.MODEL.AUDIO.DROPOUT_VALUES,
                             pre_classifier=cfg.MODEL.AUDIO.PRE_CLASSIFIER,
-                            classify=cfg.MODEL.AUDIO.CLASSIFY
+                            classify=cfg.MODEL.AUDIO.CLASSIFY,
+                            return_sequences=cfg.MODEL.MULTIMODAL.NEW and model_name == 'multimodal'
                         )
                     )
+
     if cfg.MODEL.NAME == 'multimodal':
         if cfg.MODEL.MULTIMODAL.LOAD_TEXT_CHECKPOINT:
             models[0].load_backbone(cfg.MODEL.MULTIMODAL.TEXT_CHECKPOINT_PATH, drop_classifier=True)
         if cfg.MODEL.MULTIMODAL.LOAD_AUDIO_CHECKPOINT:
             models[1].load_backbone(cfg.MODEL.MULTIMODAL.AUDIO_CHECKPOINT_PATH, drop_classifier=True)
-        model = MultimodalModel(
+        
+        if cfg.MODEL.MULTIMODAL.NEW:
+            model = MultimodalModelMulT(
                         text_model=models[0],
                         audio_model=models[1],
                         dropout_values=cfg.MODEL.MULTIMODAL.DROPOUT_VALUES,
                         freeze_text=cfg.MODEL.MULTIMODAL.FREEZE_TEXT,
                         freeze_audio=cfg.MODEL.MULTIMODAL.FREEZE_AUDIO
                     )
+        else:
+            model = MultimodalModel(
+                            text_model=models[0],
+                            audio_model=models[1],
+                            dropout_values=cfg.MODEL.MULTIMODAL.DROPOUT_VALUES,
+                            freeze_text=cfg.MODEL.MULTIMODAL.FREEZE_TEXT,
+                            freeze_audio=cfg.MODEL.MULTIMODAL.FREEZE_AUDIO
+                        )
     else:
         model = models[0]
     return model
