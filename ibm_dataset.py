@@ -1,3 +1,4 @@
+from genericpath import sameopenfile
 import os
 import ast
 import librosa
@@ -9,14 +10,15 @@ from torch.utils.data import Dataset
 
 class IBMDebater(Dataset):
     def __init__(
-        self, 
-        path, 
-        split, 
-        tokenizer=None, 
-        chunk_length=15, 
-        text_transform=None, 
-        load_audio=True, 
-        load_text=True
+            self, 
+            path, 
+            split, 
+            tokenizer=None, 
+            chunk_length=15, 
+            text_transform=None, 
+            load_audio=True, 
+            load_text=True,
+            sample_cut_type='first'
         ):
         """
             Custom Pytorch dataset class for reading the IBM Debater 'Debate Speech Analysis' dataset, which can be freely downloaded 
@@ -49,6 +51,7 @@ class IBMDebater(Dataset):
         self.load_audio = load_audio
         self.load_text = load_text
         self.chunk_length = chunk_length
+        self.sample_cut_type = sample_cut_type
 
         # Loading the csv files containing the dataset splits and the additional information for eaach element
         metadata_path = os.path.join(path, 'RecordedDebatingDataset_Release5_metadata.csv')
@@ -85,7 +88,14 @@ class IBMDebater(Dataset):
             with open(text_path, 'r') as f:
                 text = f.read()
             if self.tokenizer:
-                text = self.tokenizer(text, truncation=True, max_length=512)
+                text = self.tokenizer(text, truncation=False)
+                for k in text.keys():
+                    if self.sample_cut_type == 'first':
+                        text[k] = text[k][:512]
+                    elif self.sample_cut_type == 'last':
+                        text[k] = [text[k][0]] + text[k][-511:]
+                    else:
+                        text[k] = text[k][:256] + text[k][-256:]
             if self.text_transform:
                 for k in text.keys():
                     text[k] = self.text_transform(text[k])
@@ -94,8 +104,20 @@ class IBMDebater(Dataset):
         # Load wav file corresponding to idx and resample to 16000, which is the sample rate that Wav2Vec2
         # expectes as input
         if self.load_audio:
-            wave, sr = librosa.load(audio_path, duration=self.chunk_length)
-            wave = torch.tensor(wave)
+            audio_len = librosa.get_duration(filename=audio_path)
+            if self.sample_cut_type == 'first':
+                wave, sr = librosa.load(audio_path, duration=self.chunk_length)
+                wave = torch.tensor(wave)
+            elif self.sample_cut_type == 'last':
+                wave, sr = librosa.load(audio_path, offset=audio_len - self.chunk_length)
+                wave = torch.tensor(wave)
+            if self.sample_cut_type == 'both':
+                first_wave, sr = librosa.load(audio_path, duration=self.chunk_length / 2)
+                second_wave, _ = librosa.load(audio_path, offset=audio_len - self.chunk_length / 2)
+                first_wave = torch.tensor(first_wave)
+                second_wave = torch.tensor(second_wave)
+                wave = torch.cat([first_wave, second_wave])
+            
             wave = torchaudio.transforms.Resample(orig_freq=sr, new_freq=16000)(wave)
             output.append(wave)
 
