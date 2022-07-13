@@ -7,6 +7,7 @@ DATASET:
     NUM_WORKERS: 0
   LOAD_AUDIO: true
   LOAD_TEXT: false
+  SAMPLE_CUT_TYPE: first
   SMALL_VERSION: false
   TOKENIZER: distilbert-base-uncased
 MODEL:

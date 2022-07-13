@@ -1,6 +1,6 @@
 from models.text_model import TextModel
 from models.audio_model import AudioModel
-from models.multimodal_model import MultimodalModel, MultimodalModelMulT
+from models.multimodal_model import MultimodalModel, MulT
 
 def get_params_groups(model, optimizer_args):
     """
@@ -49,7 +49,7 @@ def get_model(cfg):
                             dropout_values=cfg.MODEL.TEXT.DROPOUT_VALUES,
                             pre_classifier=cfg.MODEL.TEXT.PRE_CLASSIFIER,
                             classify=cfg.MODEL.TEXT.CLASSIFY,
-                            return_sequences=cfg.MODEL.MULTIMODAL.NEW and model_name == 'multimodal'
+                            return_sequences=cfg.MODEL.MULTIMODAL.CROSS.USE and model_name == 'multimodal'
                         )
                     )
     if model_name == 'audio' or model_name == 'multimodal':
@@ -59,7 +59,7 @@ def get_model(cfg):
                             dropout_values=cfg.MODEL.AUDIO.DROPOUT_VALUES,
                             pre_classifier=cfg.MODEL.AUDIO.PRE_CLASSIFIER,
                             classify=cfg.MODEL.AUDIO.CLASSIFY,
-                            return_sequences=cfg.MODEL.MULTIMODAL.NEW and model_name == 'multimodal'
+                            return_sequences=cfg.MODEL.MULTIMODAL.CROSS.USE and model_name == 'multimodal'
                         )
                     )
 
@@ -69,13 +69,15 @@ def get_model(cfg):
         if cfg.MODEL.MULTIMODAL.LOAD_AUDIO_CHECKPOINT:
             models[1].load_backbone(cfg.MODEL.MULTIMODAL.AUDIO_CHECKPOINT_PATH, drop_classifier=True)
         
-        if cfg.MODEL.MULTIMODAL.NEW:
-            model = MultimodalModelMulT(
+        if cfg.MODEL.MULTIMODAL.CROSS.USE:
+            model = MulT(
                         text_model=models[0],
                         audio_model=models[1],
                         dropout_values=cfg.MODEL.MULTIMODAL.DROPOUT_VALUES,
                         freeze_text=cfg.MODEL.MULTIMODAL.FREEZE_TEXT,
-                        freeze_audio=cfg.MODEL.MULTIMODAL.FREEZE_AUDIO
+                        freeze_audio=cfg.MODEL.MULTIMODAL.FREEZE_AUDIO,
+                        crossmodal_type=cfg.MODEL.MULTIMODAL.CROSS.TYPE,
+                        pool_operation=cfg.MODEL.MULTIMODAL.CROSS.POOL,
                     )
         else:
             model = MultimodalModel(

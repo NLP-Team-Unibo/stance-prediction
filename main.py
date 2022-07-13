@@ -1,5 +1,6 @@
 import numpy as np
 from argparse import ArgumentParser
+from torchinfo import summary
 
 import torch
 import torchtext
@@ -43,6 +44,7 @@ def train_pipeline(args):
     chunk_length = cfg.DATASET.CHUNK_LENGTH
     text_transform = torchtext.transforms.ToTensor()
     tokenizer = DistilBertTokenizer.from_pretrained(cfg.DATASET.TOKENIZER)
+    sample_cut_type = cfg.DATASET.SAMPLE_CUT_TYPE
 
     # Define how the data will be pre-processed by calling IBMDebater
     data_train = IBMDebater(data_path, 
@@ -51,14 +53,16 @@ def train_pipeline(args):
                     chunk_length=chunk_length, 
                     text_transform=text_transform,
                     load_audio=load_audio,
-                    load_text=load_text)
+                    load_text=load_text,
+                    sample_cut_type=sample_cut_type)
     data_val = IBMDebater(data_path, 
                     split='validation', 
                     tokenizer=tokenizer, 
                     chunk_length=chunk_length, 
                     text_transform=text_transform,
                     load_audio=load_audio,
-                    load_text=load_text)
+                    load_text=load_text,
+                    sample_cut_type=sample_cut_type)
 
     # Splits the whole dataset into train and validation.
     # If specified, use just a small subset of the original dataset.
@@ -97,6 +101,7 @@ def train_pipeline(args):
 
     # Get the model accoriding to the configuration file
     model = get_model(cfg)
+    summary(model)
 
     # Set up optimizer, scheduler and other training loop parameters/utils according to the configuration file
     optimizer = cfg.TRAIN.OPTIMIZER
