@@ -117,8 +117,15 @@ class IBMDebater(Dataset):
                 first_wave = torch.tensor(first_wave)
                 second_wave = torch.tensor(second_wave)
                 wave = torch.cat([first_wave, second_wave])
-            
+
             wave = torchaudio.transforms.Resample(orig_freq=sr, new_freq=16000)(wave)
+            
+            target = self.chunk_length * 16000
+
+            if len(wave) < target:
+                wave = torch.nn.functional.pad(wave, (0, target - len(wave)))
+            else:
+                wave = wave[:target]
             output.append(wave)
 
         # Convert label to numeric format
