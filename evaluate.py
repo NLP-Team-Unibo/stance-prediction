@@ -42,6 +42,7 @@ def evaluate_pipeline(args):
     chunk_length = cfg.DATASET.CHUNK_LENGTH
     text_transform = torchtext.transforms.ToTensor()
     tokenizer = DistilBertTokenizer.from_pretrained(cfg.DATASET.TOKENIZER)
+    sample_cut_type = cfg.DATASET.SAMPLE_CUT_TYPE
 
     # Define how the data will be pre-processed by calling IBMDebater
     data_test = IBMDebater(data_path, 
@@ -50,7 +51,8 @@ def evaluate_pipeline(args):
                     chunk_length=chunk_length, 
                     text_transform=text_transform,
                     load_audio=load_audio,
-                    load_text=load_text)
+                    load_text=load_text,
+                    sample_cut_type=sample_cut_type)
     
     model_name = cfg.MODEL.NAME
 

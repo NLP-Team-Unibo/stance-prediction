@@ -1,12 +1,14 @@
 DATASET:
-  CHUNK_LENGTH: 15
+  CHUNK_LENGTH: 10
   DATA_PATH: data/ibm_debater/full
   LOADER:
-    BATCH_SIZE: 16
+    BATCH_SIZE: 1
     DROP_LAST: false
     NUM_WORKERS: 0
   LOAD_AUDIO: false
   LOAD_TEXT: true
+  LOAD_MOTION: true
+  SAMPLE_CUT_TYPE: last
   SMALL_VERSION: false
   TOKENIZER: distilbert-base-uncased
 MODEL:
@@ -22,12 +24,12 @@ MODEL:
 SETTINGS:
   DEVICE: cuda
 TRAIN:
-  CHECKPOINT_PATH: ''
+  CHECKPOINT_PATH: 'checkpoints/bart_mult.pkl'
   EARLY_STOPPING:
     PATIENCE: 3
-  EPOCHS: 20
-  LR: 2.0e-05
+  EPOCHS: 30
+  LR: 2.0e-03
   LR_SCHEDULER: {}
   OPTIMIZER: adam
   OPTIMIZER_ARGS: {}
-  SAVE_CHECKPOINT: false
+  SAVE_CHECKPOINT: true

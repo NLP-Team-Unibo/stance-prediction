@@ -23,8 +23,8 @@ This work is focused on the [IBMDebater "Debate Speech Analysis"](https://aclant
 The main focus of this project is to try to see if using spoken features together with text could lead to an improvement in performance in detecting stances.
 
 We address the Stance Prediction task by developing three kinds of models:
-* **Text Model**: tries to predict the stances of the speech transcriptions. Its core is [DistilBert](https://arxiv.org/abs/1910.01108)
-* **Audio Model**: tries to predict the stances of the speeches. Its core is [Wav2Vec2](https://arxiv.org/abs/2006.11477)
+* **Text Model**: tries to predict the stances of the speech transcriptions. Its core is [DistilBERT](https://arxiv.org/abs/1910.01108)
+* **Audio Model**: tries to predict the stances of the speeches. Its core is [wav2vec 2.0](https://arxiv.org/abs/2006.11477)
 * **Multimodal Model**: tries to predict the stances using both speeches and their transcriptions. Combines both the aforementioned models.
 
 <img align="right"  src="docs/multimodal.png" alt="confusion_matrix" length = 400 width = 400>

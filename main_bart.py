@@ -1,5 +1,6 @@
 import numpy as np
 from argparse import ArgumentParser
+from models.multimodal_bart.tokenizer import MultimodalBartTokenizer
 from torchinfo import summary
 
 import torch
@@ -8,10 +9,11 @@ from torch import nn, optim
 from torch.utils.data import DataLoader, random_split
 
 import transformers
-from transformers import DistilBertTokenizer
+from transformers import DistilBertTokenizer, BartTokenizer
 
 from config import config
 from train import train_loop
+from train_bart import train_loop as train_loop_bart
 from ibm_dataset import IBMDebater
 
 from utils.train import *
@@ -19,6 +21,8 @@ from utils.early_stopping import *
 from utils.batch_generators import *
 
 transformers.logging.set_verbosity_error()
+
+MULTIMODAL = True
 
 
 def train_pipeline(args):
@@ -41,9 +45,16 @@ def train_pipeline(args):
     data_path = cfg.DATASET.DATA_PATH
     load_audio = cfg.DATASET.LOAD_AUDIO
     load_text = cfg.DATASET.LOAD_TEXT
+    load_motion = cfg.DATASET.LOAD_MOTION
     chunk_length = cfg.DATASET.CHUNK_LENGTH
     text_transform = torchtext.transforms.ToTensor()
-    tokenizer = DistilBertTokenizer.from_pretrained(cfg.DATASET.TOKENIZER)
+    if load_motion:
+        if MULTIMODAL:
+            tokenizer = MultimodalBartTokenizer()
+        else:
+            tokenizer = BartTokenizer.from_pretrained('facebook/bart-base')
+    else:
+        tokenizer = DistilBertTokenizer.from_pretrained(cfg.DATASET.TOKENIZER)
     sample_cut_type = cfg.DATASET.SAMPLE_CUT_TYPE
 
     # Define how the data will be pre-processed by calling IBMDebater
@@ -54,7 +65,9 @@ def train_pipeline(args):
                     text_transform=text_transform,
                     load_audio=load_audio,
                     load_text=load_text,
-                    sample_cut_type=sample_cut_type)
+                    sample_cut_type=sample_cut_type,
+                    load_audio_emb=MULTIMODAL,
+                    load_motion=load_motion)
     data_val = IBMDebater(data_path, 
                     split='validation', 
                     tokenizer=tokenizer, 
@@ -62,7 +75,9 @@ def train_pipeline(args):
                     text_transform=text_transform,
                     load_audio=load_audio,
                     load_text=load_text,
-                    sample_cut_type=sample_cut_type)
+                    sample_cut_type=sample_cut_type,
+                    load_audio_emb=MULTIMODAL,
+                    load_motion=load_motion)
 
     # Splits the whole dataset into train and validation.
     # If specified, use just a small subset of the original dataset.
@@ -76,7 +91,13 @@ def train_pipeline(args):
 
     # Specify the batch collate function according to the type of model
     if model_name == 'text':
-        collate_fn = batch_generator_text
+        if load_motion:
+            if MULTIMODAL:
+                collate_fn = batch_generator_mult_bart
+            else:
+                collate_fn = batch_generator_text_bart
+        else:
+            collate_fn = batch_generator_text
     elif model_name == 'audio':
         collate_fn = batch_generator_wav2vec
     else:
@@ -100,7 +121,7 @@ def train_pipeline(args):
                         num_workers=num_workers)
 
     # Get the model accoriding to the configuration file
-    model = get_model(cfg)
+    model = get_model(cfg, multimodal=MULTIMODAL)
     summary(model)
 
     # Set up optimizer, scheduler and other training loop parameters/utils according to the configuration file
@@ -119,9 +140,14 @@ def train_pipeline(args):
         scheduler = optim.lr_scheduler.StepLR(optimizer, **scheduler)
     early_stopping = EarlyStopping(model, patience=early_stopping.PATIENCE)
     criterion = nn.BCEWithLogitsLoss()
+    if load_motion:
+        criterion_gen = nn.CrossEntropyLoss()
     
     # Start train loop and save checkpoints at the end if the configuration file specifies it
-    train_loop(model, optimizer, criterion, early_stopping, loader_train, loader_val, epochs, device, step_lr=scheduler, cfg=cfg)
+    if load_motion:
+        train_loop_bart(model, optimizer, criterion_cls=criterion, criterion_gen=criterion_gen, early_stopping=early_stopping, loader_train=loader_train, loader_val=loader_val, epochs=epochs, device=device, step_lr=scheduler, cfg=cfg)
+    else:
+        train_loop(model, optimizer, criterion, early_stopping, loader_train, loader_val, epochs, device, step_lr=scheduler, cfg=cfg)
     if cfg.TRAIN.SAVE_CHECKPOINT:
         path = cfg.TRAIN.CHECKPOINT_PATH
         model.save_backbone(path)
