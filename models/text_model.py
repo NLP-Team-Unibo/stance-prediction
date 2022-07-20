@@ -123,8 +123,14 @@ class BartTextModel(StancePredictionModule):
         self.return_sequences = return_sequences
 
         # Make all the DistilBert parameters non-trainable
-        #for param in self.shared_base_model.parameters():
-        #    param.requires_grad = False
+        for param in self.shared_base_model.parameters():
+            param.requires_grad = False
+
+        for param in self.shared_base_model.shared.parameters():
+            param.requires_grad = True
+        
+        for param in self.shared_base_model.get_encoder().embed_audio.parameters():
+            param.requires_grad = True
         
         # Make it possible to fine-tune the last n_trainable_layers of the transformer.
         #if n_trainable_layers > 0:
@@ -169,8 +175,7 @@ class BartTextModel(StancePredictionModule):
 
         if self.multimodal:
             text_gen = self.text_gen(input_ids=input_ids, 
-            audio_features=audio_features, attention_mask=attention_mask, labels=labels,
-            decoder_input_ids=decoder_input_ids, decoder_attention_mask=decoder_attention_mask)
+            audio_features=audio_features, attention_mask=attention_mask, labels=labels)
         else:
             text_gen = self.text_gen(input_ids=input_ids, attention_mask=attention_mask, labels=labels)
         return x, text_gen

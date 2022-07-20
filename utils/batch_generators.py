@@ -66,10 +66,12 @@ def batch_generator_text_bart(batch):
     for data in batch:
         if len(data[0]['input_ids']) < max_len: 
             for key in data[0].keys():
-                data[0][key] = torch.nn.functional.pad(data[0][key], (0, max_len - len(data[0][key])), value=1)
+                value = 1 if key == 'input_ids' else 0
+                data[0][key] = torch.nn.functional.pad(data[0][key], (0, max_len - len(data[0][key])), value=value)
         if len(data[1]['input_ids']) < max_len_motion: 
             for key in data[1].keys():
-                data[1][key] = torch.nn.functional.pad(data[1][key], (0, max_len_motion - len(data[1][key])), value=1)
+                value = 1 if key == 'input_ids' else 0
+                data[1][key] = torch.nn.functional.pad(data[1][key], (0, max_len_motion - len(data[1][key])), value=value)
     
     # Group text sequences by key
     keys = batch[0][0].keys()
@@ -109,10 +111,12 @@ def batch_generator_mult_bart(batch):
     for data in batch:
         if len(data[0]['input_ids']) < max_len: 
             for key in data[0].keys():
-                data[0][key] = torch.nn.functional.pad(data[0][key], (0, max_len - len(data[0][key])), value=1)
+                value = 1 if key == 'input_ids' else 0
+                data[0][key] = torch.nn.functional.pad(data[0][key], (0, max_len - len(data[0][key])), value=value)
         if len(data[1]['labels']) < max_len_motion: 
             for key in data[1].keys():
-                data[1][key] = torch.nn.functional.pad(data[1][key], (0, max_len_motion - len(data[1][key])), value=1)
+                value = -100 if key == 'labels' else 0 # Set the padded tokens to -100 in labels
+                data[1][key] = torch.nn.functional.pad(data[1][key], (0, max_len_motion - len(data[1][key])), value=value)
     
     # Group text sequences by key
     keys_text = batch[0][0].keys()

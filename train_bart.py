@@ -117,7 +117,7 @@ def train(model, optimizer, criterion_cls, criterion_gen, data_loader, device):
             audio_feat = data[2].to(device)
             output = model(**input_dict, **labels_gen, audio_features=audio_feat)
         else:
-            labels_cls = data[3].to(device)
+            labels_cls = data[2].to(device)
             output = model(**input_dict, labels=labels_gen['input_ids'])
 
         # Compute the loss between the output and the target labels
@@ -190,7 +190,7 @@ def validate(model, criterion_cls, criterion_gen, data_loader, device):
                 audio_feat = data[2].to(device)
                 output = model(**input_dict, **labels_gen, audio_features=audio_feat)
             else:
-                labels_cls = data[3].to(device)
+                labels_cls = data[2].to(device)
                 output = model(**input_dict, labels=labels_gen['input_ids'])
 
             # Compute the loss between the output and the target labels

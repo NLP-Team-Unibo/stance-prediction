@@ -13,7 +13,7 @@ SPLITS = ['train', 'test', 'validation']
 if __name__ == '__main__':
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('--input_dir', type=str, required=False, default='full/',
+    parser.add_argument('--input_dir', type=str, required=False, default='data/ibm_debater/full/',
                         help='input directory')
     parser.add_argument('--output_dir', type=str, required=False, default='out/',
                         help='output directory')
