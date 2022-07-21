@@ -1,5 +1,7 @@
 import torch
 from tqdm import tqdm
+import evaluate
+from utils.train import get_decoded_preds_and_labels
 from torch.utils.tensorboard import SummaryWriter
 
 def train_loop(
@@ -12,7 +14,9 @@ def train_loop(
         epochs, 
         device,
         step_lr=None,
-        cfg=''
+        cfg='',
+        gen_metrics=None,
+        tokenizer=None
     ):
     """
         This function excecute the full training procedure for a specified model. It logs all the results obtained during training using a SummaryWriter.
@@ -53,7 +57,7 @@ def train_loop(
         # Execute a training step and store its results
         train_results = train(model, optimizer, criterion, loader_train, device)
         # Execute a validation step and store its results
-        val_results = validate(model, criterion, loader_val, device)
+        val_results = validate(model, criterion, loader_val, device, gen_metrics=gen_metrics, tokenizer=tokenizer)
 
         # Log the results
         writer.add_scalar('Train loss', train_results['train_loss'], i)
@@ -158,7 +162,7 @@ def train(model, optimizer, criterion, data_loader, device):
     print('\t'.join([f'{key}: {results[key]}' for key in results.keys()]), end='\t')
     return results
 
-def validate(model, criterion, data_loader, device):
+def validate(model, criterion, data_loader, device, gen_metrics=None, tokenizer=None):
     """
         This function excecute a single validation step.
 
@@ -180,6 +184,7 @@ def validate(model, criterion, data_loader, device):
     """
     model.eval()
     with torch.no_grad():
+        gen_metrics = [evaluate.load(metric_name) for metric_name in gen_metrics]
         total_loss = 0.0
         total_acc = 0.0
         total_cls_loss = 0.0
@@ -224,6 +229,14 @@ def validate(model, criterion, data_loader, device):
             total_loss += loss.item()
             total += labels.size(0)
 
+            # Compute text generation metrics
+            if gen_metrics is not None:
+                preds, motions = get_decoded_preds_and_labels(**input_dict, audio=waves, labels=motion, model=model, tokenizer=tokenizer)
+                with open('gen_dump.txt', 'a') as f:
+                    f.write('\n' + '\n'.join(preds) + '\n')
+                for metric in gen_metrics:
+                    metric.add_batch(predictions=preds, references=motions)
+
             acc = ((output > 0).float() == labels).sum().item()
             total_acc += acc
         results['val_loss'] = total_loss / len(data_loader)
@@ -231,44 +244,13 @@ def validate(model, criterion, data_loader, device):
         if model_name == 'TextGenerationModel':
             results['val_loss_gen'] = total_gen_loss / len(data_loader)
             results['val_loss_cls'] = total_cls_loss / len(data_loader)
+            if gen_metrics is not None:
+                for metric in gen_metrics:
+                    try:
+                        results.update(metric.compute())
+                    except ZeroDivisionError:
+                        results[metric.__class__.__name__] = 0.0
         print('\t'.join([f'{key}: {results[key]}' for key in results.keys()]))
-        #print('val_loss:', total_loss / len(data_loader), 'val_accuracy:', total_acc / total)
+        del preds
+        del gen_metrics
     return results
-
-
-
-
-"""metric = datasets.load_metric("rouge")
-
-
-def postprocess_text(preds, labels):
-    preds = [pred.strip() for pred in preds]
-    labels = [label.strip() for label in labels]
-
-    return preds, labels
-
-
-def compute_metrics(eval_preds):
-    preds, labels = eval_preds
-    if isinstance(preds, tuple):
-        preds = preds[0]
-    decoded_preds = tokenizer.batch_decode(preds, skip_special_tokens=True)
-    # Replace -100 in the labels as we can't decode them.
-    labels = np.where(labels != -100, labels, tokenizer.pad_token_id)
-    decoded_labels = tokenizer.batch_decode(labels, skip_special_tokens=True)
-
-    # Some simple post-processing
-    decoded_preds, decoded_labels = postprocess_text(decoded_preds, decoded_labels)
-
-    result = metric.compute(
-        predictions=decoded_preds, references=decoded_labels, use_stemmer=True
-    )
-    # Extract a few results from ROUGE
-    result = {key: value.mid.fmeasure * 100 for key, value in result.items()}
-
-    prediction_lens = [
-        np.count_nonzero(pred != tokenizer.pad_token_id) for pred in preds
-    ]
-    result["gen_len"] = np.mean(prediction_lens)
-    result = {k: round(v, 4) for k, v in result.items()}
-    return result"""

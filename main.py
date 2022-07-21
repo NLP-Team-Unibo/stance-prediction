@@ -7,6 +7,7 @@ import torchtext
 from torch import nn, optim
 from torch.utils.data import DataLoader, random_split
 
+import evaluate
 import transformers
 from transformers import AutoTokenizer
 
@@ -124,9 +125,13 @@ def train_pipeline(args):
         scheduler = optim.lr_scheduler.StepLR(optimizer, **scheduler)
     early_stopping = EarlyStopping(model, patience=early_stopping.PATIENCE)
     criterion = nn.BCEWithLogitsLoss()
+
+    gen_metrics = None
+    if len(cfg.TRAIN.GENERATION_METRICS) > 0 and model_name == 'text_generation':
+        gen_metrics =cfg.TRAIN.GENERATION_METRICS
     
     # Start train loop and save checkpoints at the end if the configuration file specifies it
-    train_loop(model, optimizer, criterion, early_stopping, loader_train, loader_val, epochs, device, step_lr=scheduler, cfg=cfg)
+    train_loop(model, optimizer, criterion, early_stopping, loader_train, loader_val, epochs, device, step_lr=scheduler, cfg=cfg, gen_metrics=gen_metrics, tokenizer=tokenizer)
     if cfg.TRAIN.SAVE_CHECKPOINT:
         path = cfg.TRAIN.CHECKPOINT_PATH
         model.save_backbone(path)

@@ -1,3 +1,4 @@
+import torch
 from models.text_generation_model import TextGenerationModel
 from models.text_model import TextModel
 from models.audio_model import AudioModel
@@ -44,7 +45,14 @@ def get_model(cfg):
     model_name = cfg.MODEL.NAME
     models = []
     if model_name == 'text_generation':
-        model = TextGenerationModel()
+        model = TextGenerationModel(
+                    dropout_value=cfg.MODEL.TEXT_GENERATION.DROPOUT_VALUE,
+                    bart_encoder_n_trainable_layers=cfg.MODEL.TEXT_GENERATION.BART_ENCODER_N_TRAINABLE_LAYERS,
+                    bart_decoder_n_trainable_layers=cfg.MODEL.TEXT_GENERATION.BART_DECODER_N_TRAINABLE_LAYERS,
+                    wav2vec2_n_transformers=cfg.MODEL.TEXT_GENERATION.WAV2VEC2_N_TRANSFORMERS,
+                    wav2vec2_n_trainable_layers=cfg.MODEL.TEXT_GENERATION.WAV2VEC2_N_TRAINABLE_LAYERS,
+                    cross_attn_n_layers=cfg.MODEL.TEXT_GENERATION.CROSS_ATTN_N_LAYERS,
+                )
     else:
         if model_name == 'text' or model_name == 'multimodal':
             models.append(TextModel(
@@ -94,3 +102,21 @@ def get_model(cfg):
         else:
             model = models[0]
     return model
+    
+
+def get_decoded_preds_and_labels(input_ids, attention_mask, audio, labels, model , tokenizer):
+    decoded_preds = model.generate(
+        input_ids=input_ids, 
+        attention_mask=attention_mask,
+        audio_embeddings=audio, 
+        max_length=100, 
+        min_length=1,
+        num_beams=3, 
+        early_stopping=True)
+    decoded_preds = tokenizer.batch_decode(decoded_preds, skip_special_tokens=True)
+    labels[labels == -100] = tokenizer.pad_token_id
+    
+    decoded_labels = tokenizer.batch_decode(labels, skip_special_tokens=True)
+    decoded_preds = [pred.strip() for pred in decoded_preds]
+    decoded_labels = [label.strip() for label in decoded_labels]
+    return decoded_preds, decoded_labels
