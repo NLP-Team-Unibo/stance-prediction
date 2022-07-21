@@ -9,6 +9,7 @@ _C.DATASET = CN()
 _C.DATASET.DATA_PATH = 'data/ibm_debater/full'
 _C.DATASET.LOAD_AUDIO = False
 _C.DATASET.LOAD_TEXT = True
+_C.DATASET.LOAD_MOTION = False
 _C.DATASET.TOKENIZER = 'distilbert-base-uncased'
 _C.DATASET.CHUNK_LENGTH = 15
 _C.DATASET.SMALL_VERSION = False
@@ -17,11 +18,11 @@ _C.DATASET.SAMPLE_CUT_TYPE = 'first' # 'first', 'last', 'both'
 _C.DATASET.LOADER = CN()
 _C.DATASET.LOADER.BATCH_SIZE = 16
 _C.DATASET.LOADER.DROP_LAST = False
-_C.DATASET.LOADER.NUM_WORKERS = 0
+_C.DATASET.LOADER.NUM_WORKERS = 4
 
 
 _C.MODEL = CN()
-_C.MODEL.NAME = 'text'
+_C.MODEL.NAME = 'text' #text, audio, multimodal, text-generation
 
 _C.MODEL.TEXT = CN()
 _C.MODEL.TEXT.N_TRAINABLE_LAYERS = 2
@@ -117,9 +118,27 @@ def save_cfg_multimodal_default():
         f.flush()
         f.close()
 
+def save_cfg_text_generation_default():
+    """Save in a YAML file a template configuration file for training the TextGenerationModel."""
+    cfg = _C.clone()
+    cfg.DATASET.LOADER.BATCH_SIZE = 4
+    cfg.DATASET.LOAD_AUDIO = True
+    cfg.DATASET.LOAD_MOTION = True
+    cfg.DATASET.CHUNK_LENGTH = 10
+    cfg.DATASET.TOKENIZER = 'facebook/bart-base'
+    cfg.MODEL.NAME = 'text_generation'
+    cfg.MODEL.TEXT.CLASSIFY = False
+    cfg.MODEL.AUDIO.CLASSIFY = False
+    
+    with open('config/text_generation.yaml', 'w') as f:
+        f.write(cfg.dump())
+        f.flush()
+        f.close()
+
 if __name__ == '__main__':
     """Automatically save the template version of the config files when config.py is executed as a script."""
     save_cfg_default()
     save_cfg_text_default()
     save_cfg_audio_default()
     save_cfg_multimodal_default()
+    save_cfg_text_generation_default()

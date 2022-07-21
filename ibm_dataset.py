@@ -18,7 +18,8 @@ class IBMDebater(Dataset):
             text_transform=None, 
             load_audio=True, 
             load_text=True,
-            sample_cut_type='first'
+            sample_cut_type='first',
+            load_motion=False
         ):
         """
             Custom Pytorch dataset class for reading the IBM Debater 'Debate Speech Analysis' dataset, which can be freely downloaded 
@@ -52,6 +53,7 @@ class IBMDebater(Dataset):
         self.load_text = load_text
         self.chunk_length = chunk_length
         self.sample_cut_type = sample_cut_type
+        self.load_motion = load_motion
 
         # Loading the csv files containing the dataset splits and the additional information for eaach element
         metadata_path = os.path.join(path, 'RecordedDebatingDataset_Release5_metadata.csv')
@@ -103,6 +105,7 @@ class IBMDebater(Dataset):
 
         # Load wav file corresponding to idx and resample to 16000, which is the sample rate that Wav2Vec2
         # expectes as input
+
         if self.load_audio:
             audio_len = librosa.get_duration(filename=audio_path)
             if self.sample_cut_type == 'first':
@@ -127,6 +130,12 @@ class IBMDebater(Dataset):
             else:
                 wave = wave[:target]
             output.append(wave)
+        
+        # Load and tokenize the motion
+        if self.load_motion:
+            motion = self.annotations['motion'].iloc[idx]
+            motion = self.tokenizer(motion, truncation=True, return_tensors='pt')
+            output.append(motion['input_ids'].squeeze())
 
         # Convert label to numeric format
         label = self.annotations['speech-to-motion-polarity'].iloc[idx]

@@ -98,6 +98,8 @@ def train(model, optimizer, criterion, data_loader, device):
     model.train()
     total_loss = 0.0
     total_acc = 0.0
+    total_cls_loss = 0.0
+    total_gen_loss = 0.0
     total = 0
     results = {}
     model_name = model.__class__.__name__
@@ -112,18 +114,31 @@ def train(model, optimizer, criterion, data_loader, device):
             waves = data[0].to(device)
             labels = data[1].to(device)
             output = model(waves)
-        else:
+        elif model_name == 'MultimodalModel':
             input_dict = data[0]
             input_dict = {k:input_dict[k].to(device) for k in input_dict.keys()}
             waves = data[1].to(device)
             labels = data[2].to(device)
             output = model(input_dict, waves)
+        elif model_name == 'TextGenerationModel':
+            input_dict = data[0]
+            input_dict = {k:input_dict[k].to(device) for k in input_dict.keys()}
+            waves = data[1].to(device)
+            motion = data[2].to(device)
+            labels = data[3].to(device)
+            loss_lm, loss_cls, output = model(input_dict['input_ids'], input_dict['attention_mask'], waves, motion, labels_cls=labels, return_dict=False)
 
         # Compute the loss between the output and the target labels
-        output = output.squeeze(1)
-        loss = criterion(output, labels)
-        total_loss += loss.item()
+        
+        output = output.squeeze()
+        if model_name != 'TextGenerationModel':
+            loss = criterion(output, labels)
+        else:
+            total_cls_loss += loss_cls.item()
+            total_gen_loss += loss_lm.item()
+            loss = loss_lm + loss_cls
 
+        total_loss += loss.item()
         acc = ((output > 0).float() == labels).sum().item()
         total_acc += acc
         total += labels.size(0)
@@ -133,9 +148,14 @@ def train(model, optimizer, criterion, data_loader, device):
         loss.backward()
         optimizer.step()
     
-    print('train_loss:', total_loss / len(data_loader), 'train_accuracy:', total_acc / total, end='\t')
+    #print('train_loss:', total_loss / len(data_loader), 'train_accuracy:', total_acc / total, end='\t')
     results['train_loss'] = total_loss / len(data_loader)
     results['train_accuracy'] = total_acc / total
+    if model_name == 'TextGenerationModel':
+        results['train_loss_gen'] = total_gen_loss / len(data_loader)
+        results['train_loss_cls'] = total_cls_loss / len(data_loader)
+    
+    print('\t'.join([f'{key}: {results[key]}' for key in results.keys()]), end='\t')
     return results
 
 def validate(model, criterion, data_loader, device):
@@ -162,6 +182,8 @@ def validate(model, criterion, data_loader, device):
     with torch.no_grad():
         total_loss = 0.0
         total_acc = 0.0
+        total_cls_loss = 0.0
+        total_gen_loss = 0.0
         total = 0
         results = {}
         model_name = model.__class__.__name__
@@ -176,16 +198,29 @@ def validate(model, criterion, data_loader, device):
                 waves = data[0].to(device)
                 labels = data[1].to(device)
                 output = model(waves)
-            else:
+            elif model_name == 'MultimodalModel':
                 input_dict = data[0]
                 input_dict = {k:input_dict[k].to(device) for k in input_dict.keys()}
                 waves = data[1].to(device)
                 labels = data[2].to(device)
                 output = model(input_dict, waves)
-            output = output.squeeze(1)
+            elif model_name == 'TextGenerationModel':
+                input_dict = data[0]
+                input_dict = {k:input_dict[k].to(device) for k in input_dict.keys()}
+                waves = data[1].to(device)
+                motion = data[2].to(device)
+                labels = data[3].to(device)
+                loss_lm, loss_cls, output = model(input_dict['input_ids'], input_dict['attention_mask'], waves, motion, labels_cls=labels, return_dict=False)
+
             
+            output = output.squeeze()
             # Compute the loss between the output and the target labels
-            loss = criterion(output, labels)
+            if model_name != 'TextGenerationModel':
+                loss = criterion(output, labels)
+            else:
+                total_cls_loss += loss_cls.item()
+                total_gen_loss += loss_lm.item()
+                loss = loss_lm + loss_cls
             total_loss += loss.item()
             total += labels.size(0)
 
@@ -193,5 +228,47 @@ def validate(model, criterion, data_loader, device):
             total_acc += acc
         results['val_loss'] = total_loss / len(data_loader)
         results['val_accuracy'] = total_acc / total
-        print('val_loss:', total_loss / len(data_loader), 'val_accuracy:', total_acc / total)
+        if model_name == 'TextGenerationModel':
+            results['val_loss_gen'] = total_gen_loss / len(data_loader)
+            results['val_loss_cls'] = total_cls_loss / len(data_loader)
+        print('\t'.join([f'{key}: {results[key]}' for key in results.keys()]))
+        #print('val_loss:', total_loss / len(data_loader), 'val_accuracy:', total_acc / total)
     return results
+
+
+
+
+"""metric = datasets.load_metric("rouge")
+
+
+def postprocess_text(preds, labels):
+    preds = [pred.strip() for pred in preds]
+    labels = [label.strip() for label in labels]
+
+    return preds, labels
+
+
+def compute_metrics(eval_preds):
+    preds, labels = eval_preds
+    if isinstance(preds, tuple):
+        preds = preds[0]
+    decoded_preds = tokenizer.batch_decode(preds, skip_special_tokens=True)
+    # Replace -100 in the labels as we can't decode them.
+    labels = np.where(labels != -100, labels, tokenizer.pad_token_id)
+    decoded_labels = tokenizer.batch_decode(labels, skip_special_tokens=True)
+
+    # Some simple post-processing
+    decoded_preds, decoded_labels = postprocess_text(decoded_preds, decoded_labels)
+
+    result = metric.compute(
+        predictions=decoded_preds, references=decoded_labels, use_stemmer=True
+    )
+    # Extract a few results from ROUGE
+    result = {key: value.mid.fmeasure * 100 for key, value in result.items()}
+
+    prediction_lens = [
+        np.count_nonzero(pred != tokenizer.pad_token_id) for pred in preds
+    ]
+    result["gen_len"] = np.mean(prediction_lens)
+    result = {k: round(v, 4) for k, v in result.items()}
+    return result"""

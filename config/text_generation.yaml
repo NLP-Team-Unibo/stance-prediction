@@ -1,16 +1,16 @@
 DATASET:
-  CHUNK_LENGTH: 15
+  CHUNK_LENGTH: 10
   DATA_PATH: data/ibm_debater/full
   LOADER:
-    BATCH_SIZE: 8
+    BATCH_SIZE: 4
     DROP_LAST: false
     NUM_WORKERS: 4
   LOAD_AUDIO: true
-  LOAD_MOTION: false
+  LOAD_MOTION: true
   LOAD_TEXT: true
   SAMPLE_CUT_TYPE: first
   SMALL_VERSION: false
-  TOKENIZER: distilbert-base-uncased
+  TOKENIZER: facebook/bart-base
 MODEL:
   AUDIO:
     CLASSIFY: false
@@ -33,7 +33,7 @@ MODEL:
     LOAD_AUDIO_CHECKPOINT: false
     LOAD_TEXT_CHECKPOINT: false
     TEXT_CHECKPOINT_PATH: ''
-  NAME: multimodal
+  NAME: text_generation
   TEXT:
     CLASSIFY: false
     DISTILBERT: distilbert-base-uncased

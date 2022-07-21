@@ -8,7 +8,7 @@ from torch import nn, optim
 from torch.utils.data import DataLoader, random_split
 
 import transformers
-from transformers import DistilBertTokenizer
+from transformers import AutoTokenizer
 
 from config import config
 from train import train_loop
@@ -43,8 +43,9 @@ def train_pipeline(args):
     load_text = cfg.DATASET.LOAD_TEXT
     chunk_length = cfg.DATASET.CHUNK_LENGTH
     text_transform = torchtext.transforms.ToTensor()
-    tokenizer = DistilBertTokenizer.from_pretrained(cfg.DATASET.TOKENIZER)
+    tokenizer = AutoTokenizer.from_pretrained(cfg.DATASET.TOKENIZER)
     sample_cut_type = cfg.DATASET.SAMPLE_CUT_TYPE
+    load_motion = cfg.DATASET.LOAD_MOTION
 
     # Define how the data will be pre-processed by calling IBMDebater
     data_train = IBMDebater(data_path, 
@@ -54,7 +55,8 @@ def train_pipeline(args):
                     text_transform=text_transform,
                     load_audio=load_audio,
                     load_text=load_text,
-                    sample_cut_type=sample_cut_type)
+                    sample_cut_type=sample_cut_type,
+                    load_motion=load_motion)
     data_val = IBMDebater(data_path, 
                     split='validation', 
                     tokenizer=tokenizer, 
@@ -62,7 +64,8 @@ def train_pipeline(args):
                     text_transform=text_transform,
                     load_audio=load_audio,
                     load_text=load_text,
-                    sample_cut_type=sample_cut_type)
+                    sample_cut_type=sample_cut_type,
+                    load_motion=load_motion)
 
     # Splits the whole dataset into train and validation.
     # If specified, use just a small subset of the original dataset.
@@ -79,6 +82,8 @@ def train_pipeline(args):
         collate_fn = batch_generator_text
     elif model_name == 'audio':
         collate_fn = batch_generator_wav2vec
+    elif model_name == 'text_generation':
+        collate_fn = batch_generator_mult_bart
     else:
         collate_fn = batch_generator_multimodal
 

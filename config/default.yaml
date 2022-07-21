@@ -4,8 +4,9 @@ DATASET:
   LOADER:
     BATCH_SIZE: 16
     DROP_LAST: false
-    NUM_WORKERS: 0
+    NUM_WORKERS: 4
   LOAD_AUDIO: false
+  LOAD_MOTION: false
   LOAD_TEXT: true
   SAMPLE_CUT_TYPE: first
   SMALL_VERSION: false
