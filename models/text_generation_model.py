@@ -1,3 +1,4 @@
+from turtle import forward
 import torchaudio
 import torch
 from torch import nn
@@ -5,12 +6,47 @@ from transformers.models.bart.modeling_bart import shift_tokens_right
 from transformers import BartForConditionalGeneration, BartPretrainedModel, BartModel
 from transformers.modeling_outputs import Seq2SeqLMOutput
 from models.stance_prediction_module import StancePredictionModule
+from models.mult_modules import transformer
+
+class CrossAttention(nn.Module):
+    def __init__(self, embed_dim, num_heads, n_transformers):
+        super().__init__()
+        assert n_transformers >= 0
+        self.n_transformers = n_transformers
+        if n_transformers == 0:
+            self.attn = nn.MultiheadAttention(embed_dim=embed_dim, num_heads=num_heads, batch_first=True)
+        else:
+            self.attn = transformer.TransformerEncoder(embed_dim=embed_dim, num_heads=num_heads, layers=n_transformers)
+    def forward(self, query, key, value):
+        if self.n_transformers > 0:
+            query = query.permute(1, 0, 2)
+            key = key.permute(1, 0, 2)
+            value = value.permute(1, 0, 2)
+            x = self.attn(query, key, value)
+            x = x.permute(1, 0, 2)
+        else:
+            x, _ = self.attn(query, key, value)
+            
+        return x
+                
 
 class BartMultForConditionalGeneration(BartForConditionalGeneration):
-    _keys_to_ignore_on_load_missing = ['attn.in_proj_bias', 'attn.out_proj.weight', 'attn.out_proj.bias', 'attn.in_proj_weight', 'lm_head.weight', 'final_logits_bias']
-    def __init__(self, config):
+    _keys_to_ignore_on_load_missing = ['attn.in_proj_bias', 'attn.out_proj.weight', 
+                                       'attn.out_proj.bias', 'attn.in_proj_weight', 
+                                       'lm_head.weight', 'final_logits_bias', 
+                                       'attn.attn.version', 'attn.attn.layers.0.fc1.bias', 
+                                       'attn.attn.layers.0.layer_norms.1.bias', 'attn.attn.layers.1.fc2.weight', 
+                                       'attn.attn.layer_norm.weight', 'attn.attn.layer_norm.bias', 
+                                       'attn.attn.embed_positions._float_tensor', 'attn.attn.layers.1.fc1.weight', 
+                                       'attn.attn.layers.1.layer_norms.0.bias', 'attn.attn.layers.0.layer_norms.0.weight', 
+                                       'attn.attn.layers.0.fc2.weight', 'attn.attn.layers.1.fc2.bias', 
+                                       'attn.attn.layers.0.fc1.weight', 'attn.attn.layers.1.layer_norms.0.weight', 
+                                       'attn.attn.layers.1.layer_norms.1.bias', 'attn.attn.layers.1.layer_norms.1.weight', 
+                                       'attn.attn.layers.0.layer_norms.1.weight', 'attn.attn.layers.0.fc2.bias', 
+                                       'attn.attn.layers.1.fc1.bias', 'attn.attn.layers.0.layer_norms.0.bias']
+    def __init__(self, config, n_transformers=0):
         super().__init__(config)
-        self.attn = nn.MultiheadAttention(embed_dim=config.d_model, num_heads=8, batch_first=True)
+        self.attn = CrossAttention(embed_dim=self.config.d_model, num_heads=8, n_transformers=n_transformers)
     
     def _prepare_encoder_decoder_kwargs_for_generation(
         self, inputs_tensor: torch.Tensor, model_kwargs, model_input_name):
@@ -109,11 +145,10 @@ class BartMultForConditionalGeneration(BartForConditionalGeneration):
                 mult_ouputs.append(out)
             mult_outputs = torch.stack(mult_outputs, axis=0)
         """
-
         text_output = outputs[0]
         
         #mult_outputs = text_output
-        mult_outputs, _ = self.attn(query=text_output, key=audio_embeddings, value=audio_embeddings)
+        mult_outputs = self.attn(query=text_output, key=audio_embeddings, value=audio_embeddings)
         lm_logits = self.lm_head(mult_outputs)+ self.final_logits_bias
 
         masked_lm_loss = None
@@ -137,23 +172,44 @@ class BartMultForConditionalGeneration(BartForConditionalGeneration):
         )
 
 class TextGenerationModel(StancePredictionModule):
-    def __init__(self):
+    def __init__(
+            self, 
+            dropout_value = 0.3,
+            bart_encoder_n_trainable_layers = 6,
+            bart_decoder_n_trainable_layers = 6,
+            wav2vec2_n_transformers = 12,
+            wav2vec2_n_trainable_layers = 12,
+            cross_attn_n_layers = 0,
+        ):
         super(TextGenerationModel, self).__init__()
-        self.bart = BartMultForConditionalGeneration.from_pretrained('facebook/bart-base')
+        self.bart = BartMultForConditionalGeneration.from_pretrained('facebook/bart-base', cross_attn_n_layers)
         self.__bundle = torchaudio.pipelines.WAV2VEC2_BASE
         self.wav2vec2 = self.__bundle.get_model()
-        self.wav2vec2.encoder.transformer.layers = self.wav2vec2.encoder.transformer.layers[:6]
+        self.wav2vec2.encoder.transformer.layers = self.wav2vec2.encoder.transformer.layers[:wav2vec2_n_transformers]
 
         for param in self.bart.get_encoder().parameters():
             param.requires_grad = False
+        if bart_encoder_n_trainable_layers > 0:
+            for layer in self.bart.get_encoder().layers[-bart_encoder_n_trainable_layers:]:
+                for param in layer.parameters():
+                    param.requires_grad = True
 
+        for param in self.bart.get_decoder().parameters():
+            param.requires_grad = False
+        if bart_decoder_n_trainable_layers > 0:
+            for layer in self.bart.get_decoder().layers[-bart_decoder_n_trainable_layers:]:
+                for param in layer.parameters():
+                    param.requires_grad = True
+
+        assert wav2vec2_n_transformers >= wav2vec2_n_trainable_layers
         for param in self.wav2vec2.parameters():
             param.requires_grad = False
-        for layer in self.wav2vec2.encoder.transformer.layers:
-            for param in layer.parameters():
-                param.requires_grad = True
+        if wav2vec2_n_trainable_layers > 0:
+            for layer in self.wav2vec2.encoder.transformer.layers[-wav2vec2_n_trainable_layers:]:
+                for param in layer.parameters():
+                    param.requires_grad = True
 
-
+        self.dropout = nn.Dropout(p=dropout_value)
         self.relu = nn.ReLU()
         self.classifier = nn.Linear(2*768, 1)
         
@@ -165,6 +221,8 @@ class TextGenerationModel(StancePredictionModule):
         out_bart = out_bart[:, -1, :]
 
         out_cls = torch.concat([out_bart, out_audio], axis=1)
+        out_cls = self.dropout(out_cls)
+
         out_cls = self.relu(out_cls)
         out_cls = self.classifier(out_cls)
         out_cls = out_cls.squeeze(1)
@@ -175,42 +233,5 @@ class TextGenerationModel(StancePredictionModule):
         return loss_lm, loss_cls, out_cls
 
     def generate(self, **kwargs):
-        #print(self.bart.config.max_length, self.bart.config.min_length)
-        kwargs['max_length'] = 10
-        kwargs['num_beams'] = 15
+        kwargs['audio_embeddings'], _ = self.wav2vec2(kwargs['audio_embeddings'])
         return self.bart.generate(**kwargs)
-"""
-ids = torch.randint(low=10, high=1000, size=(1, 1024))
-mask = torch.ones((1, 1024))
-audio = torch.rand(size=(1, 499, 768))
-model = TextGenerationModel()
-#model(ids, mask, audio)
-print(model.generate(input_ids=ids, attention_mask=mask, audio_embeddings=audio))
-
-"""
-
-"""a = torch.ones(size=(2, 10))
-
-beam_scores = torch.zeros((10, 2), dtype=torch.float, device=a.device)
-print(beam_scores.shape, a.shape)
-
-print((torch.ones((10, 1), dtype=torch.long) * 3).shape)"""
-
-"""
-
-"""
-
-
-# <B, seq_length>
-# <beam_size*B, seq_lenght> = 1         <beam_size*B=1, seq_length, embedding> != <1, seq_lenght, embedding>
-# <beam_size*B, seq_length=2>            <B,                                         <beam_size*B, seq_length, embedding>
-
-# for beam in beam_size:
-    #<B, seq_lenght, embedding> <1, seq_lenght, embedding>
-
-# https://huggingface.co/blog/how-to-generate
-
-#x = torch.tensor([[1, 2, 3], [4,5,6]])
-#print(x.shape)
-#x = x.repeat_interleave(2, dim=0)
-#print(x, x.shape)
