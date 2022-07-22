@@ -48,7 +48,8 @@ def get_model(cfg):
         model = TextGenerationModel(
                     dropout_value=cfg.MODEL.TEXT_GENERATION.DROPOUT_VALUE,
                     bart_encoder_n_trainable_layers=cfg.MODEL.TEXT_GENERATION.BART_ENCODER_N_TRAINABLE_LAYERS,
-                    bart_decoder_n_trainable_layers=cfg.MODEL.TEXT_GENERATION.BART_DECODER_N_TRAINABLE_LAYERS,
+                    bart_decoder_gen_n_trainable_layers=cfg.MODEL.TEXT_GENERATION.BART_DECODER_GEN_N_TRAINABLE_LAYERS,
+                    bart_decoder_cls_n_trainable_layers=cfg.MODEL.TEXT_GENERATION.BART_DECODER_CLS_N_TRAINABLE_LAYERS,
                     wav2vec2_n_transformers=cfg.MODEL.TEXT_GENERATION.WAV2VEC2_N_TRANSFORMERS,
                     wav2vec2_n_trainable_layers=cfg.MODEL.TEXT_GENERATION.WAV2VEC2_N_TRAINABLE_LAYERS,
                     cross_attn_n_layers=cfg.MODEL.TEXT_GENERATION.CROSS_ATTN_N_LAYERS,

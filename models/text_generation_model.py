@@ -2,8 +2,8 @@ import torchaudio
 import torch
 from torch import nn
 from transformers.models.bart.modeling_bart import shift_tokens_right
-from transformers import BartForConditionalGeneration
-from transformers.modeling_outputs import Seq2SeqLMOutput
+from transformers import BartForConditionalGeneration, BartForSequenceClassification
+from transformers.modeling_outputs import Seq2SeqLMOutput, BaseModelOutput, Seq2SeqModelOutput, Seq2SeqSequenceClassifierOutput
 from models.stance_prediction_module import StancePredictionModule
 from models.mult_modules import transformer
 
@@ -27,84 +27,77 @@ class CrossAttention(nn.Module):
             x, _ = self.attn(query, key, value)
             
         return x
-                
 
-class BartMultForConditionalGeneration(BartForConditionalGeneration):
-    _keys_to_ignore_on_load_missing = ['attn.in_proj_bias', 'attn.out_proj.weight', 
-                                       'attn.out_proj.bias', 'attn.in_proj_weight', 
-                                       'lm_head.weight', 'final_logits_bias', 
-                                       'attn.attn.version', 'attn.attn.layers.0.fc1.bias', 
-                                       'attn.attn.layers.0.layer_norms.1.bias', 'attn.attn.layers.1.fc2.weight', 
-                                       'attn.attn.layer_norm.weight', 'attn.attn.layer_norm.bias', 
-                                       'attn.attn.embed_positions._float_tensor', 'attn.attn.layers.1.fc1.weight', 
-                                       'attn.attn.layers.1.layer_norms.0.bias', 'attn.attn.layers.0.layer_norms.0.weight', 
-                                       'attn.attn.layers.0.fc2.weight', 'attn.attn.layers.1.fc2.bias', 
-                                       'attn.attn.layers.0.fc1.weight', 'attn.attn.layers.1.layer_norms.0.weight', 
-                                       'attn.attn.layers.1.layer_norms.1.bias', 'attn.attn.layers.1.layer_norms.1.weight', 
-                                       'attn.attn.layers.0.layer_norms.1.weight', 'attn.attn.layers.0.fc2.bias', 
-                                       'attn.attn.layers.1.fc1.bias', 'attn.attn.layers.0.layer_norms.0.bias']
-    def __init__(self, config, use_audio=True, generate_motion=True, n_transformers=0):
-        super().__init__(config)
-        self.attn = CrossAttention(embed_dim=self.config.d_model, num_heads=8, n_transformers=n_transformers)
-        self.use_audio = use_audio
-        self.generate_motion = generate_motion
-    
-    def _prepare_encoder_decoder_kwargs_for_generation(
-        self, inputs_tensor: torch.Tensor, model_kwargs, model_input_name):
-        # 1. get encoder
-        encoder = self.get_encoder()
+class BartCustomForSequenceClassification(BartForSequenceClassification):
+    def __init__(self, config, model, **kwargs):
+        super().__init__(config, **kwargs)
+        self.model = model
+        self.classification_head = None
 
-        # 2. prepare encoder args and encoder kwargs from model kwargs
-        irrelevant_prefix = ["decoder_", "cross_attn", "use_cache", "audio_embeddings"]
-        encoder_kwargs = {
-            argument: value
-            for argument, value in model_kwargs.items()
-            if not any(argument.startswith(p) for p in irrelevant_prefix)
-        }
-
-        # 3. make sure that encoder returns `ModelOutput`
-        model_input_name = model_input_name if model_input_name is not None else self.main_input_name
-        encoder_kwargs["return_dict"] = True
-        encoder_kwargs[model_input_name] = inputs_tensor
-        model_kwargs["encoder_outputs"] = encoder(**encoder_kwargs)
-
-        return model_kwargs
-
-    def prepare_inputs_for_generation(
+    def forward(
         self,
-        decoder_input_ids,
-        past=None,
-        attention_mask=None,
-        head_mask=None,
-        decoder_head_mask=None,
-        cross_attn_head_mask=None,
-        use_cache=None,
-        encoder_outputs=None,
-        **kwargs
+        input_ids = None,
+        attention_mask = None,
+        audio_embeddings = None,
+        decoder_input_ids = None,
+        decoder_attention_mask = None,
+        head_mask = None,
+        decoder_head_mask = None,
+        cross_attn_head_mask = None,
+        encoder_outputs = None,
+        inputs_embeds = None,
+        decoder_inputs_embeds = None,
+        labels = None,
+        use_cache = None,
+        output_attentions = None,
+        output_hidden_states = None,
+        return_dict = None
     ):
-        # cut decoder_input_ids if past is used
-        #print('decode input ', decoder_input_ids.shape)
-        if past is not None:
-            decoder_input_ids = decoder_input_ids[:, -1:]
+        
+        return_dict = return_dict if return_dict is not None else self.config.use_return_dict
+        if labels is not None:
+            use_cache = False
 
-        if kwargs['audio_embeddings'] is not None:
-            batch_size = kwargs['audio_embeddings'].shape[0]
-            audio_embeddings = kwargs['audio_embeddings'] = kwargs['audio_embeddings'].repeat_interleave(decoder_input_ids.shape[0] // batch_size, dim=0)
-        else:
-            audio_embeddings = None
-        return {
-            "input_ids": None,  # encoder_outputs is defined. input_ids not needed
-            "audio_embeddings": audio_embeddings, #kwargs['audio_embeddings'],
-            "encoder_outputs": encoder_outputs,
-            "past_key_values": past,
-            "decoder_input_ids": decoder_input_ids,
-            "attention_mask": attention_mask,
-            "head_mask": head_mask,
-            "decoder_head_mask": decoder_head_mask,
-            "cross_attn_head_mask": cross_attn_head_mask,
-            "use_cache": use_cache,  # change this to avoid caching (presumably for debugging)
-        }
+        if input_ids is None and inputs_embeds is not None:
+            raise NotImplementedError(
+                f"Passing input embeddings is currently not supported for {self.__class__.__name__}"
+            )
 
+        outputs = self.model(
+            input_ids,
+            attention_mask=attention_mask,
+            audio_embeddings=audio_embeddings,
+            decoder_input_ids=decoder_input_ids,
+            decoder_attention_mask=decoder_attention_mask,
+            head_mask=head_mask,
+            decoder_head_mask=decoder_head_mask,
+            cross_attn_head_mask=cross_attn_head_mask,
+            encoder_outputs=encoder_outputs,
+            inputs_embeds=inputs_embeds,
+            decoder_inputs_embeds=decoder_inputs_embeds,
+            use_cache=use_cache,
+            output_attentions=output_attentions,
+            output_hidden_states=output_hidden_states,
+            return_dict=return_dict,
+        )
+        hidden_states = outputs[0]  # last hidden state
+
+        """eos_mask = input_ids.eq(self.config.eos_token_id)
+        print
+
+        if len(torch.unique_consecutive(eos_mask.sum(1))) > 1:
+            raise ValueError("All examples must have the same number of <eos> tokens.")
+        sentence_representation = hidden_states[eos_mask, :].view(hidden_states.size(0), -1, hidden_states.size(-1))[
+            :, -1, :
+        ]"""
+        sentence_representation = hidden_states[:, -1, :]
+        return sentence_representation
+
+class BartCustomForConditionalGeneration(BartForConditionalGeneration):
+    def __init__(self, config, model):
+        super().__init__(config)
+        self.model = model
+    
     def forward(self, input_ids=None, attention_mask=None, audio_embeddings=None, decoder_input_ids=None, decoder_attention_mask=None, head_mask=None, decoder_head_mask=None, cross_attn_head_mask=None, encoder_outputs=None, past_key_values=None, inputs_embeds=None, decoder_inputs_embeds=None, labels=None, use_cache=None, output_attentions=None, output_hidden_states=None, return_dict=None):
         """
         labels (`torch.LongTensor` of shape `(batch_size, sequence_length)`, *optional*):
@@ -127,6 +120,7 @@ class BartMultForConditionalGeneration(BartForConditionalGeneration):
         outputs = self.model(
             input_ids,
             attention_mask=attention_mask,
+            audio_embeddings=audio_embeddings,
             decoder_input_ids=decoder_input_ids,
             encoder_outputs=encoder_outputs,
             decoder_attention_mask=decoder_attention_mask,
@@ -141,31 +135,16 @@ class BartMultForConditionalGeneration(BartForConditionalGeneration):
             output_hidden_states=output_hidden_states,
             return_dict=return_dict,
         )
-        """
-        if self.num_beams > 0:
-            split_texts = torch.split(text_output, self.num_beams, axis=0)
-            for text_output in split_texts:
-                out, _ = self.attn(query=text_output, key=audio_embeddings, value=audio_embeddings)
-                mult_ouputs.append(out)
-            mult_outputs = torch.stack(mult_outputs, axis=0)
-        """
-        text_output = outputs[0]
-        
-        #mult_outputs = text_output
-        if audio_embeddings is None:
-            audio_embeddings = text_output
-        mult_outputs = self.attn(query=text_output, key=audio_embeddings, value=audio_embeddings)
+        lm_logits = self.lm_head(outputs[0]) + self.final_logits_bias
 
         masked_lm_loss = None
-        lm_logits = None
-        if self.generate_motion:
-            lm_logits = self.lm_head(mult_outputs)+ self.final_logits_bias            
-            if labels is not None:
-                loss_fct = nn.CrossEntropyLoss()
-                masked_lm_loss = loss_fct(lm_logits.view(-1, self.config.vocab_size), labels.view(-1))
+        if labels is not None:
+            loss_fct = nn.CrossEntropyLoss()
+            masked_lm_loss = loss_fct(lm_logits.view(-1, self.config.vocab_size), labels.view(-1))
 
         if not return_dict:
-            return (masked_lm_loss, mult_outputs) if masked_lm_loss is not None else (lm_logits, mult_outputs)
+            output = (lm_logits,) + outputs[1:]
+            return ((masked_lm_loss,) + output) if masked_lm_loss is not None else output
 
         return Seq2SeqLMOutput(
             loss=masked_lm_loss,
@@ -179,12 +158,162 @@ class BartMultForConditionalGeneration(BartForConditionalGeneration):
             encoder_attentions=outputs.encoder_attentions,
         )
 
+from transformers import BartModel
+from transformers.models.bart.modeling_bart import BartDecoder, BartEncoder
+
+class BartCustomEncoder(BartEncoder):
+    _keys_to_ignore_on_load_missing = ['attn.in_proj_bias', 'attn.out_proj.weight', 
+                                       'attn.out_proj.bias', 'attn.in_proj_weight', 
+                                       'lm_head.weight', 'final_logits_bias', 
+                                       'attn.attn.version', 'attn.attn.layers.0.fc1.bias', 
+                                       'attn.attn.layers.0.layer_norms.1.bias', 'attn.attn.layers.1.fc2.weight', 
+                                       'attn.attn.layer_norm.weight', 'attn.attn.layer_norm.bias', 
+                                       'attn.attn.embed_positions._float_tensor', 'attn.attn.layers.1.fc1.weight', 
+                                       'attn.attn.layers.1.layer_norms.0.bias', 'attn.attn.layers.0.layer_norms.0.weight', 
+                                       'attn.attn.layers.0.fc2.weight', 'attn.attn.layers.1.fc2.bias', 
+                                       'attn.attn.layers.0.fc1.weight', 'attn.attn.layers.1.layer_norms.0.weight', 
+                                       'attn.attn.layers.1.layer_norms.1.bias', 'attn.attn.layers.1.layer_norms.1.weight', 
+                                       'attn.attn.layers.0.layer_norms.1.weight', 'attn.attn.layers.0.fc2.bias', 
+                                       'attn.attn.layers.1.fc1.bias', 'attn.attn.layers.0.layer_norms.0.bias']
+    def __init__(self, config, embed_tokens, n_transformers=0):
+        super().__init__(config, embed_tokens)
+        self.attn = CrossAttention(embed_dim=config.d_model, num_heads=8, n_transformers=n_transformers)
+    
+
+    def forward(
+        self,
+        input_ids = None,
+        attention_mask = None,
+        audio_embeddings=None,
+        head_mask = None,
+        inputs_embeds = None,
+        output_attentions = None,
+        output_hidden_states = None,
+        return_dict = None,
+    ):
+        output = super().forward(
+            input_ids=input_ids, 
+            attention_mask=attention_mask,
+            head_mask=head_mask,
+            inputs_embeds=inputs_embeds,
+            output_attentions=output_attentions,
+            output_hidden_states=output_hidden_states,
+            return_dict=return_dict)
+        if audio_embeddings is None:
+            audio_embeddings = output[0]
+
+        if not return_dict:
+            out_attn = self.attn(output[0], audio_embeddings, audio_embeddings)
+            output = (out_attn, ) + output[1:]
+            return output
+        output.last_hidden_state = self.attn(output.last_hidden_state, audio_embeddings, audio_embeddings)
+        return output
+
+class BartCustomModel(BartModel):
+    def __init__(self, config, encoder):
+        super().__init__(config)
+        self.encoder = encoder
+        self.shared = self.encoder.get_input_embeddings()
+        self.decoder = BartDecoder(config, self.shared)
+
+    def forward(
+        self,
+        input_ids = None,
+        attention_mask = None,
+        audio_embeddings = None,
+        decoder_input_ids = None,
+        decoder_attention_mask = None,
+        head_mask = None,
+        decoder_head_mask = None,
+        cross_attn_head_mask = None,
+        encoder_outputs = None,
+        past_key_values = None,
+        inputs_embeds = None,
+        decoder_inputs_embeds= None,
+        use_cache = None,
+        output_attentions = None,
+        output_hidden_states = None,
+        return_dict = True
+    ):
+    
+        # different to other models, Bart automatically creates decoder_input_ids from
+        # input_ids if no decoder_input_ids are provided
+        if decoder_input_ids is None and decoder_inputs_embeds is None:
+            if input_ids is None:
+                raise ValueError(
+                    "If no `decoder_input_ids` or `decoder_inputs_embeds` are "
+                    "passed, `input_ids` cannot be `None`. Please pass either "
+                    "`input_ids` or `decoder_input_ids` or `decoder_inputs_embeds`."
+                )
+
+            decoder_input_ids = shift_tokens_right(
+                input_ids, self.config.pad_token_id, self.config.decoder_start_token_id
+            )
+
+        output_attentions = output_attentions if output_attentions is not None else self.config.output_attentions
+        output_hidden_states = (
+            output_hidden_states if output_hidden_states is not None else self.config.output_hidden_states
+        )
+        use_cache = use_cache if use_cache is not None else self.config.use_cache
+        return_dict = return_dict if return_dict is not None else self.config.use_return_dict
+
+        if encoder_outputs is None:
+            encoder_outputs = self.encoder(
+                input_ids=input_ids,
+                attention_mask=attention_mask,
+                audio_embeddings=audio_embeddings,
+                head_mask=head_mask,
+                inputs_embeds=inputs_embeds,
+                output_attentions=output_attentions,
+                output_hidden_states=output_hidden_states,
+                return_dict=return_dict,
+            )
+        # If the user passed a tuple for encoder_outputs, we wrap it in a BaseModelOutput when return_dict=True
+        elif return_dict and not isinstance(encoder_outputs, BaseModelOutput):
+            encoder_outputs = BaseModelOutput(
+                last_hidden_state=encoder_outputs[0],
+                hidden_states=encoder_outputs[1] if len(encoder_outputs) > 1 else None,
+                attentions=encoder_outputs[2] if len(encoder_outputs) > 2 else None,
+            )
+
+        # decoder outputs consists of (dec_features, past_key_value, dec_hidden, dec_attn)
+        decoder_outputs = self.decoder(
+            input_ids=decoder_input_ids,
+            attention_mask=decoder_attention_mask,
+            encoder_hidden_states=encoder_outputs[0],
+            encoder_attention_mask=attention_mask,
+            head_mask=decoder_head_mask,
+            cross_attn_head_mask=cross_attn_head_mask,
+            past_key_values=past_key_values,
+            inputs_embeds=decoder_inputs_embeds,
+            use_cache=use_cache,
+            output_attentions=output_attentions,
+            output_hidden_states=output_hidden_states,
+            return_dict=return_dict,
+        )
+
+
+        if not return_dict:
+            return decoder_outputs + encoder_outputs
+
+        return Seq2SeqModelOutput(
+            last_hidden_state=decoder_outputs.last_hidden_state,
+            past_key_values=decoder_outputs.past_key_values,
+            decoder_hidden_states=decoder_outputs.hidden_states,
+            decoder_attentions=decoder_outputs.attentions,
+            cross_attentions=decoder_outputs.cross_attentions,
+            encoder_last_hidden_state=encoder_outputs.last_hidden_state,
+            encoder_hidden_states=encoder_outputs.hidden_states,
+            encoder_attentions=encoder_outputs.attentions,
+        )
+
 class TextGenerationModel(StancePredictionModule):
     def __init__(
             self, 
             dropout_value = 0.3,
             bart_encoder_n_trainable_layers = 6,
-            bart_decoder_n_trainable_layers = 6,
+            bart_decoder_cls_n_trainable_layers = 6,
+            bart_decoder_gen_n_trainable_layers = 6,
             wav2vec2_n_transformers = 12,
             wav2vec2_n_trainable_layers = 12,
             cross_attn_n_layers = 0,
@@ -194,8 +323,12 @@ class TextGenerationModel(StancePredictionModule):
         super(TextGenerationModel, self).__init__()
         self.use_audio = use_audio
         self.generate_motion = generate_motion
-
-        self.bart = BartMultForConditionalGeneration.from_pretrained('facebook/bart-base', use_audio, generate_motion, cross_attn_n_layers)
+        bart_encoder = BartCustomEncoder.from_pretrained('facebook/bart-base', embed_tokens=None, n_transformers=cross_attn_n_layers)
+        bart_model_cls = BartCustomModel.from_pretrained('facebook/bart-base', bart_encoder)
+        self.bart_cls = BartCustomForSequenceClassification.from_pretrained('facebook/bart-base', bart_model_cls)
+        if self.generate_motion:
+            bart_model_gen = BartCustomModel.from_pretrained('facebook/bart-base', bart_encoder)
+            self.bart_gen = BartCustomForConditionalGeneration.from_pretrained('facebook/bart-base', bart_model_gen)
 
         if use_audio:
             self.__bundle = torchaudio.pipelines.WAV2VEC2_BASE
@@ -209,35 +342,47 @@ class TextGenerationModel(StancePredictionModule):
                     for param in layer.parameters():
                         param.requires_grad = True
 
-        for param in self.bart.get_encoder().parameters():
+        for param in bart_encoder.parameters():
             param.requires_grad = False
         if bart_encoder_n_trainable_layers > 0:
-            for layer in self.bart.get_encoder().layers[-bart_encoder_n_trainable_layers:]:
+            for layer in bart_encoder.layers[-bart_encoder_n_trainable_layers:]:
                 for param in layer.parameters():
                     param.requires_grad = True
 
-        for param in self.bart.get_decoder().parameters():
+        for param in bart_model_cls.get_decoder().parameters():
             param.requires_grad = False
-        if bart_decoder_n_trainable_layers > 0:
-            for layer in self.bart.get_decoder().layers[-bart_decoder_n_trainable_layers:]:
+        if bart_decoder_cls_n_trainable_layers > 0:
+            for layer in bart_model_cls.get_decoder().layers[-bart_decoder_cls_n_trainable_layers:]:
                 for param in layer.parameters():
                     param.requires_grad = True
+        
+        if self.generate_motion:
+            for param in bart_model_gen.get_decoder().parameters():
+                param.requires_grad = False
+            if bart_decoder_gen_n_trainable_layers > 0:
+                for layer in bart_model_gen.get_decoder().layers[-bart_decoder_gen_n_trainable_layers:]:
+                    for param in layer.parameters():
+                        param.requires_grad = True
 
         
 
         self.dropout = nn.Dropout(p=dropout_value)
         self.relu = nn.ReLU()
-
         self.classifier = nn.Linear(768, 1)
         
     def forward(self, input_ids, attention_mask, audio, labels_lm=None, labels_cls=None, return_dict=True):
         out_audio = None
         if self.use_audio:
             out_audio, _ = self.wav2vec2(audio)
-            
-        loss_lm, out_bart = self.bart(input_ids, attention_mask, out_audio, labels=labels_lm, return_dict=return_dict)
-               
-        out_cls = out_bart[:, -1, :]
+
+        encoder_outputs = None
+        loss_lm = None
+        if self.generate_motion:
+            out = self.bart_gen(input_ids, attention_mask, out_audio, labels=labels_lm, return_dict=return_dict)
+            loss_lm, encoder_outputs = out[0], (out[2], )
+            #_, encoder_outputs = out_bart
+        
+        out_cls = self.bart_cls(input_ids, attention_mask, out_audio, encoder_outputs=encoder_outputs, return_dict=return_dict)
 
         out_cls = self.dropout(out_cls)
         out_cls = self.relu(out_cls)
@@ -247,10 +392,9 @@ class TextGenerationModel(StancePredictionModule):
         loss_fn = nn.BCEWithLogitsLoss()
         loss_cls = loss_fn(out_cls, labels_cls)
 
-        
         return loss_lm, loss_cls, out_cls
 
     def generate(self, **kwargs):
         if self.use_audio:
             kwargs['audio_embeddings'], _ = self.wav2vec2(kwargs['audio_embeddings'])
-        return self.bart.generate(**kwargs)
+        return self.bart_gen.generate(**kwargs)
