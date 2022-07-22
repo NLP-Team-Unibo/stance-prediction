@@ -342,13 +342,6 @@ class TextGenerationModel(StancePredictionModule):
                     for param in layer.parameters():
                         param.requires_grad = True
 
-        for param in bart_encoder.parameters():
-            param.requires_grad = False
-        if bart_encoder_n_trainable_layers > 0:
-            for layer in bart_encoder.layers[-bart_encoder_n_trainable_layers:]:
-                for param in layer.parameters():
-                    param.requires_grad = True
-
         for param in bart_model_cls.get_decoder().parameters():
             param.requires_grad = False
         if bart_decoder_cls_n_trainable_layers > 0:
@@ -364,8 +357,15 @@ class TextGenerationModel(StancePredictionModule):
                     for param in layer.parameters():
                         param.requires_grad = True
 
-        
-
+        for param in bart_encoder.parameters():
+            param.requires_grad = False
+        if bart_encoder_n_trainable_layers > 0:
+            for layer in bart_encoder.layers[-bart_encoder_n_trainable_layers:]:
+                for param in layer.parameters():
+                    param.requires_grad = True
+        for param in bart_encoder.attn.parameters():
+            param.requires_grad = True
+            
         self.dropout = nn.Dropout(p=dropout_value)
         self.relu = nn.ReLU()
         self.classifier = nn.Linear(768, 1)
