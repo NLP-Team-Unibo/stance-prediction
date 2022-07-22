@@ -126,11 +126,16 @@ def train(model, optimizer, criterion, data_loader, device):
             labels = data[2].to(device)
             output = model(input_dict, waves)
         elif model_name == 'TextGenerationModel':
-            input_dict = data[0]
+            input_dict = data['text']
             input_dict = {k:input_dict[k].to(device) for k in input_dict.keys()}
-            waves = data[1].to(device)
-            motion = data[2].to(device)
-            labels = data[3].to(device)
+            waves = None
+            motion = None
+            if model.use_audio:
+                waves = data['audio'].to(device)
+            if model.generate_motion:
+                motion = data['motion'].to(device)
+            labels = data['labels'].to(device)
+            
             loss_lm, loss_cls, output = model(input_dict['input_ids'], input_dict['attention_mask'], waves, motion, labels_cls=labels, return_dict=False)
 
         # Compute the loss between the output and the target labels
@@ -139,9 +144,12 @@ def train(model, optimizer, criterion, data_loader, device):
         if model_name != 'TextGenerationModel':
             loss = criterion(output, labels)
         else:
-            total_cls_loss += loss_cls.item()
-            total_gen_loss += loss_lm.item()
-            loss = loss_lm + loss_cls
+            if model.generate_motion:
+                total_cls_loss += loss_cls.item()
+                total_gen_loss += loss_lm.item()
+                loss = loss_lm + loss_cls
+            else:
+                loss = loss_cls
 
         total_loss += loss.item()
         acc = ((output > 0).float() == labels).sum().item()
@@ -157,8 +165,10 @@ def train(model, optimizer, criterion, data_loader, device):
     results['train_loss'] = total_loss / len(data_loader)
     results['train_accuracy'] = total_acc / total
     if model_name == 'TextGenerationModel':
-        results['train_loss_gen'] = total_gen_loss / len(data_loader)
-        results['train_loss_cls'] = total_cls_loss / len(data_loader)
+        if model.generate_motion:
+            results['train_loss_gen'] = total_gen_loss / len(data_loader)
+            results['train_loss_cls'] = total_cls_loss / len(data_loader)
+        
     
     print('\t'.join([f'{key}: {results[key]}' for key in results.keys()]), end='\t')
     return results
@@ -211,11 +221,16 @@ def validate(model, criterion, data_loader, device, cfg_name='gen_dump.txt', gen
                 labels = data[2].to(device)
                 output = model(input_dict, waves)
             elif model_name == 'TextGenerationModel':
-                input_dict = data[0]
+                input_dict = data['text']
                 input_dict = {k:input_dict[k].to(device) for k in input_dict.keys()}
-                waves = data[1].to(device)
-                motion = data[2].to(device)
-                labels = data[3].to(device)
+                waves = None
+                motion = None
+                if model.use_audio:
+                    waves = data['audio'].to(device)
+                if model.generate_motion:
+                    motion = data['motion'].to(device)
+                labels = data['labels'].to(device)
+                
                 loss_lm, loss_cls, output = model(input_dict['input_ids'], input_dict['attention_mask'], waves, motion, labels_cls=labels, return_dict=False)
 
             
@@ -224,34 +239,38 @@ def validate(model, criterion, data_loader, device, cfg_name='gen_dump.txt', gen
             if model_name != 'TextGenerationModel':
                 loss = criterion(output, labels)
             else:
-                total_cls_loss += loss_cls.item()
-                total_gen_loss += loss_lm.item()
-                loss = loss_lm + loss_cls
+                if model.generate_motion:
+                    total_cls_loss += loss_cls.item()
+                    total_gen_loss += loss_lm.item()
+                    loss = loss_lm + loss_cls
+                else:
+                    loss = loss_cls
+
             total_loss += loss.item()
             total += labels.size(0)
 
-            # Compute text generation metrics
-            if gen_metrics is not None:
-                preds, motions = get_decoded_preds_and_labels(**input_dict, audio=waves, labels=motion, model=model, tokenizer=tokenizer)
-                with open(cfg_name, 'a') as f:
-                    f.write('\n' + '\n'.join(preds) + '\n')
-                for metric in gen_metrics:
-                    metric.add_batch(predictions=preds, references=motions)
+            if model.generate_motion:
+                # Compute text generation metrics
+                if gen_metrics is not None:
+                    preds, motions = get_decoded_preds_and_labels(**input_dict, audio=waves, labels=motion, model=model, tokenizer=tokenizer)
+                    with open(cfg_name, 'a') as f:
+                        f.write('\n' + '\n'.join(preds) + '\n')
+                    for metric in gen_metrics:
+                        metric.add_batch(predictions=preds, references=motions)
 
             acc = ((output > 0).float() == labels).sum().item()
             total_acc += acc
         results['val_loss'] = total_loss / len(data_loader)
         results['val_accuracy'] = total_acc / total
         if model_name == 'TextGenerationModel':
-            results['val_loss_gen'] = total_gen_loss / len(data_loader)
-            results['val_loss_cls'] = total_cls_loss / len(data_loader)
-            if gen_metrics is not None:
-                for metric in gen_metrics:
-                    try:
-                        results.update(metric.compute())
-                    except ZeroDivisionError:
-                        results[metric.__class__.__name__] = 0.0
+            if model.generate_motion:
+                results['val_loss_gen'] = total_gen_loss / len(data_loader)
+                results['val_loss_cls'] = total_cls_loss / len(data_loader)
+                if gen_metrics is not None:
+                    for metric in gen_metrics:
+                        try:
+                            results.update(metric.compute())
+                        except ZeroDivisionError:
+                            results[metric.__class__.__name__] = 0.0
         print('\t'.join([f'{key}: {results[key]}' for key in results.keys()]))
-        del preds
-        del gen_metrics
     return results

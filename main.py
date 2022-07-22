@@ -84,7 +84,10 @@ def train_pipeline(args):
     elif model_name == 'audio':
         collate_fn = batch_generator_wav2vec
     elif model_name == 'text_generation':
-        collate_fn = batch_generator_mult_bart
+        if load_audio:
+            collate_fn = batch_generator_mult_bart
+        else:
+            collate_fn = batch_generator_bart
     else:
         collate_fn = batch_generator_multimodal
 

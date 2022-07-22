@@ -66,7 +66,7 @@ def evaluate_pipeline(args):
     elif model_name == 'audio':
         collate_fn = batch_generator_wav2vec
     elif model_name == 'text_generation':
-        collate_fn = batch_generator_mult_bart
+        collate_fn = batch_generator_mult_bart if load_audio else batch_generator_bart
     else:
         collate_fn = batch_generator_multimodal
 
@@ -149,13 +149,20 @@ def test(model, data_loader, device, gen_metrics=None, tokenizer=None):
                 labels = data[2].to(device)
                 output = model(input_dict, waves)
             elif model_name == 'TextGenerationModel':
-                input_dict = data[0]
+                input_dict = data['text']
                 input_dict = {k:input_dict[k].to(device) for k in input_dict.keys()}
-                waves = data[1].to(device)
-                motion = data[2].to(device)
-                labels = data[3].to(device)
+                waves = None
+                motion = None
+                if model.use_audio:
+                    waves = data['audio'].to(device)
+                if model.generate_motion:
+                    motion = data['motion'].to(device)
+                labels = data['labels'].to(device)
+                
                 _, _, output = model(input_dict['input_ids'], input_dict['attention_mask'], waves, motion, labels_cls=labels, return_dict=False)
-            output = output.squeeze()
+            
+            if model_name != 'TextGenerationModel':
+                output = output.squeeze()
 
             total += labels.size(0)
             
@@ -165,17 +172,19 @@ def test(model, data_loader, device, gen_metrics=None, tokenizer=None):
             acc = (pred == labels).sum().item()
             total_acc += acc
 
-            # Compute text generation metrics
-            if gen_metrics is not None:
-                preds, motions = get_decoded_preds_and_labels(**input_dict, audio=waves, labels=motion, model=model, tokenizer=tokenizer)
-                with open('gen_dump_evaluate.txt', 'a') as f:
-                    f.write('\n' + '\n'.join(preds) + '\n')
-                for metric in gen_metrics:
-                    metric.add_batch(predictions=preds, references=motions)
-        print([metric.compute() for metric in gen_metrics])
+            if model.generate_motion:
+                # Compute text generation metrics
+                if gen_metrics is not None:
+                    preds, motions = get_decoded_preds_and_labels(**input_dict, audio=waves, labels=motion, model=model, tokenizer=tokenizer)
+                    with open('gen_dump_evaluate.txt', 'a') as f:
+                        f.write('\n' + '\n'.join(preds) + '\n')
+                    for metric in gen_metrics:
+                        metric.add_batch(predictions=preds, references=motions)
+
+        if model.generate_motion:
+            print([metric.compute() for metric in gen_metrics])
+
         print('test_accuracy:', total_acc / total)
-        del preds
-        del gen_metrics
     return torch.cat(y_pred), torch.cat(y_true)
 
     

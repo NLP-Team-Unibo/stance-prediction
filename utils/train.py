@@ -52,6 +52,8 @@ def get_model(cfg):
                     wav2vec2_n_transformers=cfg.MODEL.TEXT_GENERATION.WAV2VEC2_N_TRANSFORMERS,
                     wav2vec2_n_trainable_layers=cfg.MODEL.TEXT_GENERATION.WAV2VEC2_N_TRAINABLE_LAYERS,
                     cross_attn_n_layers=cfg.MODEL.TEXT_GENERATION.CROSS_ATTN_N_LAYERS,
+                    use_audio=cfg.DATASET.LOAD_AUDIO,
+                    generate_motion=cfg.DATASET.LOAD_MOTION
                 )
     else:
         if model_name == 'text' or model_name == 'multimodal':

@@ -99,10 +99,17 @@ def batch_generator_mult_bart(batch):
     max_len = 0
     max_len_motion = 0
 
+    label_cls_idx = 3
+    generate_motion = True
+    if len(batch[0]) == 3:
+        generate_motion = False
+        label_cls_idx = 2
+
     # Get the maximum sequence lenght in the batch
     for data in batch:
         max_len = max(max_len, len(data[0]['input_ids']))
-        max_len_motion = max(max_len_motion, len(data[2]))
+        if generate_motion:
+            max_len_motion = max(max_len_motion, len(data[2]))
     
     # Pad the sequences in the batch to max_len
     for data in batch:
@@ -110,15 +117,72 @@ def batch_generator_mult_bart(batch):
             for key in data[0].keys():
                 value = 1 if key == 'input_ids' else 0
                 data[0][key] = torch.nn.functional.pad(data[0][key], (0, max_len - len(data[0][key])), value=value)
-        if len(data[2]) < max_len_motion: 
-                value = -100 # Set the padded tokens to -100 in labels
-                data[2] = torch.nn.functional.pad(data[2], (0, max_len_motion - len(data[2])), value=value)
+        if generate_motion:
+            if len(data[2]) < max_len_motion: 
+                    value = -100 # Set the padded tokens to -100 in labels
+                    data[2] = torch.nn.functional.pad(data[2], (0, max_len_motion - len(data[2])), value=value)
     
     # Group text sequences by key
     keys_text = batch[0][0].keys()
     texts = {key: torch.stack([data[0][key] for data in batch]) for key in keys_text}
-    motions = torch.stack([data[2] for data in batch]) 
 
-    audio, label_cls = batch_generator_wav2vec([[b[1], b[3]] for b in batch])
+    results = {'text': texts}
+
+    if generate_motion:
+        motions = torch.stack([data[2] for data in batch])
+        results['motion'] = motions
     
-    return texts, audio, motions, label_cls
+    audio, label_cls = batch_generator_wav2vec([[b[1], b[label_cls_idx]] for b in batch])
+    results.update({'audio': audio, 'labels': label_cls})
+    
+    return results
+
+def batch_generator_bart(batch):
+    """
+        Generates the batch for the TextModel. It pads the sequences up to the lenght of the longest sequence in the batch and
+        group them by their key.
+        Parameters
+        ----------
+        batch: list of tuples
+            Where each tuple contains (input_example, label), with input_example that is a dictionary of type 
+            {'input_ids': [], 'attention_mask': []} and label that is the corresponding label id.
+        
+        Returns
+        ----------
+        results: tuple
+            A tuple containing:
+                - A dictionary containg, for each key, a batch tensor representing the input.
+                - A tensor containing the labels of the batch.
+    """
+    max_len = 0
+    max_len_motion = 0
+
+    generate_motion = True
+    if len(batch[0]) == 2:
+        generate_motion = False
+
+    # Get the maximum sequence lenght in the batch
+    for data in batch:
+        max_len = max(max_len, len(data[0]['input_ids']))
+        if generate_motion:
+            max_len_motion = max(max_len_motion, len(data[1]))
+    
+    # Pad the sequences in the batch to max_len
+    for data in batch:
+        if len(data[0]['input_ids']) < max_len: 
+            for key in data[0].keys():
+                value = 1 if key == 'input_ids' else 0
+                data[0][key] = torch.nn.functional.pad(data[0][key], (0, max_len - len(data[0][key])), value=value)
+        if generate_motion:
+            if len(data[1]) < max_len_motion: 
+                    value = -100 # Set the padded tokens to -100 in labels
+                    data[1] = torch.nn.functional.pad(data[1], (0, max_len_motion - len(data[1])), value=value)
+        
+    # Group text sequences by key
+    keys_text = batch[0][0].keys()
+    texts = {key: torch.stack([data[0][key] for data in batch]) for key in keys_text}
+    labels = torch.FloatTensor([b[2] if generate_motion else b[1] for b in batch])
+    if generate_motion:
+        motions = torch.stack([data[1] for data in batch]) 
+        return {'text':texts, 'motion': motions, 'labels': labels}
+    return {'text': texts, 'labels': labels}   

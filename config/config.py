@@ -141,6 +141,9 @@ def save_cfg_text_generation_default():
     cfg.MODEL.AUDIO.CLASSIFY = False
     
     with open('config/text_generation.yaml', 'w') as f:
+        del cfg['MODEL']['TEXT']
+        del cfg['MODEL']['MULTIMODAL']
+        del cfg['MODEL']['AUDIO']
         f.write(cfg.dump())
         f.flush()
         f.close()

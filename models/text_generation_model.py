@@ -3,7 +3,7 @@ import torchaudio
 import torch
 from torch import nn
 from transformers.models.bart.modeling_bart import shift_tokens_right
-from transformers import BartForConditionalGeneration, BartPretrainedModel, BartModel
+from transformers import BartForConditionalGeneration
 from transformers.modeling_outputs import Seq2SeqLMOutput
 from models.stance_prediction_module import StancePredictionModule
 from models.mult_modules import transformer
@@ -44,9 +44,11 @@ class BartMultForConditionalGeneration(BartForConditionalGeneration):
                                        'attn.attn.layers.1.layer_norms.1.bias', 'attn.attn.layers.1.layer_norms.1.weight', 
                                        'attn.attn.layers.0.layer_norms.1.weight', 'attn.attn.layers.0.fc2.bias', 
                                        'attn.attn.layers.1.fc1.bias', 'attn.attn.layers.0.layer_norms.0.bias']
-    def __init__(self, config, n_transformers=0):
+    def __init__(self, config, use_audio=True, generate_motion=True, n_transformers=0):
         super().__init__(config)
         self.attn = CrossAttention(embed_dim=self.config.d_model, num_heads=8, n_transformers=n_transformers)
+        self.use_audio = use_audio
+        self.generate_motion = generate_motion
     
     def _prepare_encoder_decoder_kwargs_for_generation(
         self, inputs_tensor: torch.Tensor, model_kwargs, model_input_name):
@@ -86,11 +88,14 @@ class BartMultForConditionalGeneration(BartForConditionalGeneration):
         if past is not None:
             decoder_input_ids = decoder_input_ids[:, -1:]
 
-        batch_size = kwargs['audio_embeddings'].shape[0]
-
+        if kwargs['audio_embeddings'] is not None:
+            batch_size = kwargs['audio_embeddings'].shape[0]
+            audio_embeddings = kwargs['audio_embeddings'] = kwargs['audio_embeddings'].repeat_interleave(decoder_input_ids.shape[0] // batch_size, dim=0)
+        else:
+            audio_embeddings = None
         return {
             "input_ids": None,  # encoder_outputs is defined. input_ids not needed
-            "audio_embeddings": kwargs['audio_embeddings'].repeat_interleave(decoder_input_ids.shape[0] // batch_size, dim=0), #kwargs['audio_embeddings'],
+            "audio_embeddings": audio_embeddings, #kwargs['audio_embeddings'],
             "encoder_outputs": encoder_outputs,
             "past_key_values": past,
             "decoder_input_ids": decoder_input_ids,
@@ -148,13 +153,17 @@ class BartMultForConditionalGeneration(BartForConditionalGeneration):
         text_output = outputs[0]
         
         #mult_outputs = text_output
+        if audio_embeddings is None:
+            audio_embeddings = text_output
         mult_outputs = self.attn(query=text_output, key=audio_embeddings, value=audio_embeddings)
-        lm_logits = self.lm_head(mult_outputs)+ self.final_logits_bias
 
         masked_lm_loss = None
-        if labels is not None:
-            loss_fct = nn.CrossEntropyLoss()
-            masked_lm_loss = loss_fct(lm_logits.view(-1, self.config.vocab_size), labels.view(-1))
+        lm_logits = None
+        if self.generate_motion:
+            lm_logits = self.lm_head(mult_outputs)+ self.final_logits_bias            
+            if labels is not None:
+                loss_fct = nn.CrossEntropyLoss()
+                masked_lm_loss = loss_fct(lm_logits.view(-1, self.config.vocab_size), labels.view(-1))
 
         if not return_dict:
             return (masked_lm_loss, outputs[0]) if masked_lm_loss is not None else (lm_logits, outputs[0])
@@ -180,12 +189,26 @@ class TextGenerationModel(StancePredictionModule):
             wav2vec2_n_transformers = 12,
             wav2vec2_n_trainable_layers = 12,
             cross_attn_n_layers = 0,
+            use_audio=True,
+            generate_motion=True,
         ):
         super(TextGenerationModel, self).__init__()
-        self.bart = BartMultForConditionalGeneration.from_pretrained('facebook/bart-base', cross_attn_n_layers)
-        self.__bundle = torchaudio.pipelines.WAV2VEC2_BASE
-        self.wav2vec2 = self.__bundle.get_model()
-        self.wav2vec2.encoder.transformer.layers = self.wav2vec2.encoder.transformer.layers[:wav2vec2_n_transformers]
+        self.use_audio = use_audio
+        self.generate_motion = generate_motion
+
+        self.bart = BartMultForConditionalGeneration.from_pretrained('facebook/bart-base', use_audio, generate_motion, cross_attn_n_layers)
+
+        if use_audio:
+            self.__bundle = torchaudio.pipelines.WAV2VEC2_BASE
+            self.wav2vec2 = self.__bundle.get_model()
+            self.wav2vec2.encoder.transformer.layers = self.wav2vec2.encoder.transformer.layers[:wav2vec2_n_transformers]
+            assert wav2vec2_n_transformers >= wav2vec2_n_trainable_layers
+            for param in self.wav2vec2.parameters():
+                param.requires_grad = False
+            if wav2vec2_n_trainable_layers > 0:
+                for layer in self.wav2vec2.encoder.transformer.layers[-wav2vec2_n_trainable_layers:]:
+                    for param in layer.parameters():
+                        param.requires_grad = True
 
         for param in self.bart.get_encoder().parameters():
             param.requires_grad = False
@@ -201,28 +224,31 @@ class TextGenerationModel(StancePredictionModule):
                 for param in layer.parameters():
                     param.requires_grad = True
 
-        assert wav2vec2_n_transformers >= wav2vec2_n_trainable_layers
-        for param in self.wav2vec2.parameters():
-            param.requires_grad = False
-        if wav2vec2_n_trainable_layers > 0:
-            for layer in self.wav2vec2.encoder.transformer.layers[-wav2vec2_n_trainable_layers:]:
-                for param in layer.parameters():
-                    param.requires_grad = True
+        
 
         self.dropout = nn.Dropout(p=dropout_value)
         self.relu = nn.ReLU()
-        self.classifier = nn.Linear(2*768, 1)
+        if use_audio:
+            self.classifier = nn.Linear(2*768, 1)
+        else:
+            self.classifier = nn.Linear(768, 1)
         
     def forward(self, input_ids, attention_mask, audio, labels_lm=None, labels_cls=None, return_dict=True):
-        out_audio, _ = self.wav2vec2(audio)
+        out_audio = None
+        if self.use_audio:
+            out_audio, _ = self.wav2vec2(audio)
+            
         loss_lm, out_bart = self.bart(input_ids, attention_mask, out_audio, labels=labels_lm, return_dict=return_dict)
-        
-        out_audio = torch.mean(out_audio, axis=1)
+               
         out_bart = out_bart[:, -1, :]
 
-        out_cls = torch.concat([out_bart, out_audio], axis=1)
-        out_cls = self.dropout(out_cls)
+        if self.use_audio:
+            out_audio = torch.mean(out_audio, axis=1)
+            out_cls = torch.concat([out_bart, out_audio], axis=1)
+        else:
+            out_cls = out_bart
 
+        out_cls = self.dropout(out_cls)
         out_cls = self.relu(out_cls)
         out_cls = self.classifier(out_cls)
         out_cls = out_cls.squeeze(1)
@@ -230,8 +256,10 @@ class TextGenerationModel(StancePredictionModule):
         loss_fn = nn.BCEWithLogitsLoss()
         loss_cls = loss_fn(out_cls, labels_cls)
 
+        
         return loss_lm, loss_cls, out_cls
 
     def generate(self, **kwargs):
-        kwargs['audio_embeddings'], _ = self.wav2vec2(kwargs['audio_embeddings'])
+        if self.use_audio:
+            kwargs['audio_embeddings'], _ = self.wav2vec2(kwargs['audio_embeddings'])
         return self.bart.generate(**kwargs)
