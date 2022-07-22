@@ -1,4 +1,3 @@
-from turtle import forward
 import torchaudio
 import torch
 from torch import nn
