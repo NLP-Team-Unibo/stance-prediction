@@ -131,7 +131,8 @@ def train_pipeline(args):
         gen_metrics =cfg.TRAIN.GENERATION_METRICS
     
     # Start train loop and save checkpoints at the end if the configuration file specifies it
-    train_loop(model, optimizer, criterion, early_stopping, loader_train, loader_val, epochs, device, step_lr=scheduler, cfg=cfg, gen_metrics=gen_metrics, tokenizer=tokenizer)
+    cfg_name = args.cfg_path.split('/')[-1].split('.')[0] + '.txt'
+    train_loop(model, optimizer, criterion, early_stopping, loader_train, loader_val, epochs, device, step_lr=scheduler, cfg=cfg, cfg_name=cfg_name, gen_metrics=gen_metrics, tokenizer=tokenizer)
     if cfg.TRAIN.SAVE_CHECKPOINT:
         path = cfg.TRAIN.CHECKPOINT_PATH
         model.save_backbone(path)

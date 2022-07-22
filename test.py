@@ -1,6 +1,7 @@
 import os
 from tqdm import tqdm
 from argparse import ArgumentParser
+import evaluate
 
 import torch
 import torchtext
@@ -92,7 +93,7 @@ def evaluate_pipeline(args):
     summary(model)
 	
     # Starts the evaluation procedure
-    y_pred, y_true = evaluate(model, loader_test, device, gen_metrics=gen_metrics, tokenizer=tokenizer)
+    y_pred, y_true = test(model, loader_test, device, gen_metrics=gen_metrics, tokenizer=tokenizer)
     y_pred, y_true = y_pred.cpu().numpy(), y_true.cpu().numpy()
     
     mask = ~(y_pred == y_true)
@@ -106,7 +107,7 @@ def evaluate_pipeline(args):
     os.makedirs('images/'+ model_name, exist_ok=True)
     plt.savefig(f'images/{model_name}/{cfg_path.split("/")[-1].replace(".yaml", ".png")}')
 
-def evaluate(model, data_loader, device, gen_metrics=None, tokenizer=None):
+def test(model, data_loader, device, gen_metrics=None, tokenizer=None):
     """
         This function excecute a single evaluation step.
 

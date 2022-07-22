@@ -15,6 +15,7 @@ def train_loop(
         device,
         step_lr=None,
         cfg='',
+        cfg_name = 'gen_dump.txt',
         gen_metrics=None,
         tokenizer=None
     ):
@@ -57,7 +58,7 @@ def train_loop(
         # Execute a training step and store its results
         train_results = train(model, optimizer, criterion, loader_train, device)
         # Execute a validation step and store its results
-        val_results = validate(model, criterion, loader_val, device, gen_metrics=gen_metrics, tokenizer=tokenizer)
+        val_results = validate(model, criterion, loader_val, device, cfg_name=cfg_name, gen_metrics=gen_metrics, tokenizer=tokenizer)
 
         # Log the results
         writer.add_scalar('Train loss', train_results['train_loss'], i)
@@ -162,7 +163,7 @@ def train(model, optimizer, criterion, data_loader, device):
     print('\t'.join([f'{key}: {results[key]}' for key in results.keys()]), end='\t')
     return results
 
-def validate(model, criterion, data_loader, device, gen_metrics=None, tokenizer=None):
+def validate(model, criterion, data_loader, device, cfg_name='gen_dump.txt', gen_metrics=None, tokenizer=None):
     """
         This function excecute a single validation step.
 
@@ -232,7 +233,7 @@ def validate(model, criterion, data_loader, device, gen_metrics=None, tokenizer=
             # Compute text generation metrics
             if gen_metrics is not None:
                 preds, motions = get_decoded_preds_and_labels(**input_dict, audio=waves, labels=motion, model=model, tokenizer=tokenizer)
-                with open('gen_dump.txt', 'a') as f:
+                with open(cfg_name, 'a') as f:
                     f.write('\n' + '\n'.join(preds) + '\n')
                 for metric in gen_metrics:
                     metric.add_batch(predictions=preds, references=motions)
