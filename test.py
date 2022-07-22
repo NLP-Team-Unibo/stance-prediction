@@ -182,7 +182,13 @@ def test(model, data_loader, device, gen_metrics=None, tokenizer=None):
                         metric.add_batch(predictions=preds, references=motions)
 
         if model.generate_motion:
-            print([metric.compute() for metric in gen_metrics])
+            results = {}
+            for metric in gen_metrics:
+                try:
+                    results.update(metric.compute())
+                except ZeroDivisionError:
+                    results[metric.__class__.__name__] = 0.0
+            print(results)
 
         print('test_accuracy:', total_acc / total)
     return torch.cat(y_pred), torch.cat(y_true)

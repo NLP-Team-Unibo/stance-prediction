@@ -165,7 +165,7 @@ class BartMultForConditionalGeneration(BartForConditionalGeneration):
                 masked_lm_loss = loss_fct(lm_logits.view(-1, self.config.vocab_size), labels.view(-1))
 
         if not return_dict:
-            return (masked_lm_loss, outputs[0]) if masked_lm_loss is not None else (lm_logits, outputs[0])
+            return (masked_lm_loss, mult_outputs) if masked_lm_loss is not None else (lm_logits, mult_outputs)
 
         return Seq2SeqLMOutput(
             loss=masked_lm_loss,
@@ -227,10 +227,8 @@ class TextGenerationModel(StancePredictionModule):
 
         self.dropout = nn.Dropout(p=dropout_value)
         self.relu = nn.ReLU()
-        if use_audio:
-            self.classifier = nn.Linear(2*768, 1)
-        else:
-            self.classifier = nn.Linear(768, 1)
+
+        self.classifier = nn.Linear(768, 1)
         
     def forward(self, input_ids, attention_mask, audio, labels_lm=None, labels_cls=None, return_dict=True):
         out_audio = None
@@ -239,13 +237,7 @@ class TextGenerationModel(StancePredictionModule):
             
         loss_lm, out_bart = self.bart(input_ids, attention_mask, out_audio, labels=labels_lm, return_dict=return_dict)
                
-        out_bart = out_bart[:, -1, :]
-
-        if self.use_audio:
-            out_audio = torch.mean(out_audio, axis=1)
-            out_cls = torch.concat([out_bart, out_audio], axis=1)
-        else:
-            out_cls = out_bart
+        out_cls = out_bart[:, -1, :]
 
         out_cls = self.dropout(out_cls)
         out_cls = self.relu(out_cls)
