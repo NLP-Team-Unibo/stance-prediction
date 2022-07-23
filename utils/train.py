@@ -3,6 +3,7 @@ from models.text_generation_model import TextGenerationModel
 from models.text_model import TextModel
 from models.audio_model import AudioModel
 from models.multimodal_model import MultimodalModel, MulT
+from torchinfo import summary
 
 def get_params_groups(model, optimizer_args):
     """
@@ -54,7 +55,8 @@ def get_model(cfg):
                     wav2vec2_n_trainable_layers=cfg.MODEL.TEXT_GENERATION.WAV2VEC2_N_TRAINABLE_LAYERS,
                     cross_attn_n_layers=cfg.MODEL.TEXT_GENERATION.CROSS_ATTN_N_LAYERS,
                     use_audio=cfg.DATASET.LOAD_AUDIO,
-                    generate_motion=cfg.DATASET.LOAD_MOTION
+                    generate_motion=cfg.DATASET.LOAD_MOTION,
+                    embed_audio_in_encoder=cfg.MODEL.TEXT_GENERATION.EMBED_AUDIO_IN_ENCODER
                 )
     else:
         if model_name == 'text' or model_name == 'multimodal':

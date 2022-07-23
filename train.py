@@ -258,7 +258,7 @@ def validate(model, criterion, data_loader, device, cfg_name='gen_dump.txt', gen
                 # Compute text generation metrics
                 if gen_metrics is not None:
                     preds, motions = get_decoded_preds_and_labels(**input_dict, audio=waves, labels=motion, model=model, tokenizer=tokenizer)
-                    with open(cfg_name, 'a') as f:
+                    with open(cfg_name, 'a', encoding='utf-8') as f:
                         f.write('\n' + '\n'.join(preds) + '\n')
                     
                     for metric in gen_metrics:
