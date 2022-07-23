@@ -42,7 +42,8 @@ class EarlyStopping:
         if score > self.best_score:
             self.remaining_patience = self.patience
             self.best_score = score
-            self.best_weights = copy.deepcopy(self.model.state_dict())
+            #self.best_weights = copy.deepcopy(self.model.state_dict())
+            self.best_weights = {k: v.cpu() for k, v in self.model.state_dict().items()}
         else:
             self.remaining_patience -= 1
             if self.remaining_patience == 0:

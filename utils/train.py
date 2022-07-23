@@ -116,10 +116,10 @@ def get_decoded_preds_and_labels(input_ids, attention_mask, audio, labels, model
         min_length=1,
         num_beams=3, 
         early_stopping=True)
-    decoded_preds = tokenizer.batch_decode(decoded_preds, skip_special_tokens=True)
+    decoded_preds = tokenizer.batch_decode(decoded_preds.detach().cpu(), skip_special_tokens=True)
     labels[labels == -100] = tokenizer.pad_token_id
     
-    decoded_labels = tokenizer.batch_decode(labels, skip_special_tokens=True)
+    decoded_labels = tokenizer.batch_decode(labels.detach().cpu(), skip_special_tokens=True)
     decoded_preds = [pred.strip() for pred in decoded_preds]
     decoded_labels = [label.strip() for label in decoded_labels]
     return decoded_preds, decoded_labels

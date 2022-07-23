@@ -4,6 +4,7 @@ import evaluate
 from utils.train import get_decoded_preds_and_labels
 from torch.utils.tensorboard import SummaryWriter
 
+
 def train_loop(
         model, 
         optimizer, 
@@ -55,18 +56,21 @@ def train_loop(
     writer.add_text('CFG', text_string=str(cfg))
 
     for i in range(epochs):
+        torch.cuda.empty_cache()
         # Execute a training step and store its results
         train_results = train(model, optimizer, criterion, loader_train, device)
         # Execute a validation step and store its results
         val_results = validate(model, criterion, loader_val, device, cfg_name=cfg_name, gen_metrics=gen_metrics, tokenizer=tokenizer)
 
         # Log the results
+        """
         writer.add_scalar('Train loss', train_results['train_loss'], i)
         writer.add_scalar('Train accuracy', train_results['train_accuracy'], i)
         writer.add_scalar('Val loss', val_results['val_loss'], i)
-        writer.add_scalar('Val accuracy', val_results['val_accuracy'], i)
+        writer.add_scalar('Val accuracy', val_results['val_accuracy'], i)"""
 
         # Check if the procedure must terminate due to early stopping
+        
         if early_stopping:
             if early_stopping(val_results['val_accuracy']):
                 print('Early stopping triggered, best score: ', early_stopping.best_score)
@@ -137,7 +141,7 @@ def train(model, optimizer, criterion, data_loader, device):
             labels = data['labels'].to(device)
             
             loss_lm, loss_cls, output = model(input_dict['input_ids'], input_dict['attention_mask'], waves, motion, labels_cls=labels, return_dict=False)
-
+            
         # Compute the loss between the output and the target labels
         
         output = output.squeeze()
@@ -145,21 +149,22 @@ def train(model, optimizer, criterion, data_loader, device):
             loss = criterion(output, labels)
         else:
             if model.generate_motion:
-                total_cls_loss += loss_cls.item()
-                total_gen_loss += loss_lm.item()
+                total_cls_loss += loss_cls.detach().item()
+                total_gen_loss += loss_lm.detach().item()
                 loss = loss_lm + loss_cls
             else:
                 loss = loss_cls
 
-        total_loss += loss.item()
-        acc = ((output > 0).float() == labels).sum().item()
+        total_loss += loss.detach().item()
+        acc = ((output > 0).float() == labels).sum().detach().item()
         total_acc += acc
         total += labels.size(0)
+        
 
         # Backpropagate and update the optimizer
-        optimizer.zero_grad()
         loss.backward()
         optimizer.step()
+        optimizer.zero_grad(set_to_none=True)
     
     #print('train_loss:', total_loss / len(data_loader), 'train_accuracy:', total_acc / total, end='\t')
     results['train_loss'] = total_loss / len(data_loader)
@@ -169,7 +174,7 @@ def train(model, optimizer, criterion, data_loader, device):
             results['train_loss_gen'] = total_gen_loss / len(data_loader)
             results['train_loss_cls'] = total_cls_loss / len(data_loader)
         
-    
+        
     print('\t'.join([f'{key}: {results[key]}' for key in results.keys()]), end='\t')
     return results
 
@@ -237,31 +242,35 @@ def validate(model, criterion, data_loader, device, cfg_name='gen_dump.txt', gen
             output = output.squeeze()
             # Compute the loss between the output and the target labels
             if model_name != 'TextGenerationModel':
-                loss = criterion(output, labels)
+                loss = criterion(output, labels).detach().item()
             else:
                 if model.generate_motion:
-                    total_cls_loss += loss_cls.item()
-                    total_gen_loss += loss_lm.item()
-                    loss = loss_lm + loss_cls
+                    total_cls_loss += loss_cls.detach().item()
+                    total_gen_loss += loss_lm.detach().item()
+                    loss = (loss_lm + loss_cls).detach().item()
                 else:
-                    loss = loss_cls
+                    loss = loss_cls.detach().item()
 
-            total_loss += loss.item()
+            total_loss += loss
             total += labels.size(0)
-
+            
             if model.generate_motion:
                 # Compute text generation metrics
                 if gen_metrics is not None:
                     preds, motions = get_decoded_preds_and_labels(**input_dict, audio=waves, labels=motion, model=model, tokenizer=tokenizer)
                     with open(cfg_name, 'a') as f:
                         f.write('\n' + '\n'.join(preds) + '\n')
+                    
                     for metric in gen_metrics:
                         metric.add_batch(predictions=preds, references=motions)
-
-            acc = ((output > 0).float() == labels).sum().item()
+                    del preds, motions
+            
+            acc = ((output > 0).float() == labels).sum().detach().item()
             total_acc += acc
         results['val_loss'] = total_loss / len(data_loader)
         results['val_accuracy'] = total_acc / total
+        
+        
         if model_name == 'TextGenerationModel':
             if model.generate_motion:
                 results['val_loss_gen'] = total_gen_loss / len(data_loader)
@@ -272,5 +281,7 @@ def validate(model, criterion, data_loader, device, cfg_name='gen_dump.txt', gen
                             results.update(metric.compute())
                         except ZeroDivisionError:
                             results[metric.__class__.__name__] = 0.0
-        print('\t'.join([f'{key}: {results[key]}' for key in results.keys()]))
+        
+        print('\t'.join([f'{key}: {results[key] if "rouge" not in key else results[key].mid}' for key in results.keys()]))
+        del gen_metrics
     return results
