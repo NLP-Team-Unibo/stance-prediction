@@ -67,9 +67,13 @@ class MulT(StancePredictionModule):
             pool_operation = 'avg', # ['avg', 'first', 'last']
         ):
         """
-            Creates a model accepting two inputs of different type: a text sequence, which is passed to the text_model component, and
-            a raw audio signal, which is fed as input to the audio_model. Once we obtain two separate embeddings for the inputs, they are 
-            concatenated and passed through a linear layer for the classification step.
+            Creates a MulT-inspired model accepting two inputs of different type: a text sequence, which is passed to the text_model component, and
+            a raw audio signal, which is fed as input to the audio_model. Once we obtain two separate embeddings for the inputs, they can be passed through:
+                - A stack of Multimodal Transformer layers where the audio acts like the query and the text acts like the key/value
+                - A stack of Multimodal Transformer layers where the text acts like the query and the audio acts like the key/value
+                - Both of the above options
+            After the results go through a specified pooling operation and, in the case of crossmodal_type='both', also get contatenated, they are then fed into
+            a linear head for the classification 
     
             Parameters
             ----------
@@ -78,12 +82,15 @@ class MulT(StancePredictionModule):
             audio_model: nn.Module
                 The desired AudioModel instance; it will be used to process the audio portion of the input.
             dropout_values: tuple of floats
-                The value to be used for dropout after concatenating the embeddings of the two modlities. Default to (0.3). 
+                The value to be used for dropout after obtaining the embeddings of the two modlities. Default to (0.3). 
             freeze_text: bool
                 Whether to freeze all the parameters in the text model. Default to False.
             freeze_audio: bool
                 Whether to freeze all the parameters in the audio model. Default to False.
-            
+            crossmodal_type: str
+                Whether the text, the audio or both will act as the query in the Multimodal Transformer stack. Default to 'audio2text'.
+            pool_operation: str
+                Determines which pooling operation will be applied to the output of the Multimodal Transformer. Default to 'avg'.
         """
         super(MulT, self).__init__()
         self.text_model = text_model
@@ -121,7 +128,6 @@ class MulT(StancePredictionModule):
         text_sequences = text_sequences.permute(1, 0, 2)
         audio_sequences = audio_sequences.permute(1, 0, 2)
         
-        #TODO check dropout
         audio_sequences = self.dropout(audio_sequences)
         text_sequences = self.dropout(text_sequences)
 
@@ -143,21 +149,3 @@ class MulT(StancePredictionModule):
         x = self.relu(x)       
         x = self.classifier(x)
         return x
-
-
-"""from models.text_model_mult import TextModel
-from models.audio_model_mult import AudioModel
-t = TextModel(return_sequences=True)
-a = AudioModel()
-
-m = MultimodalModelMulT(t, a)
-
-import torch
-input_id = torch.randint(0, 10, (8, 512))
-attention_mask = torch.ones((8, 512))
-
-wav = torch.rand((8, 15*16000))
-
-text = {'input_ids':input_id, 'attention_mask': attention_mask}
-x = m(text, wav)
-print(x.size())"""

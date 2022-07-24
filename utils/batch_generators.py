@@ -81,20 +81,24 @@ def batch_generator_multimodal(batch):
 
 def batch_generator_mult_bart(batch):
     """
-        Generates the batch for the TextModel. It pads the sequences up to the lenght of the longest sequence in the batch and
-        group them by their key.
+        Generates the batch for the TextGenerationModel when the acoustic features are used. 
+        It pads the input sequences and the motion up to the lenght of the longest one in the batch and groups them by their key.
+        It also calls the wav2vec2.0 batch generators in order to take care of the audio.
         Parameters
         ----------
         batch: list of tuples
-            Where each tuple contains (input_example, label), with input_example that is a dictionary of type 
-            {'input_ids': [], 'attention_mask': []} and label that is the corresponding label id.
+            Where each tuple contains either (text_input, audio_input, motion, label) or (text_input, audio_input, label) 
+            with text_input and motion that are two dictionaries of type {'input_ids': [], 'attention_mask': []},
+            label that is the corresponding classification label id and audio_input that is already a tensor.
         
         Returns
         ----------
-        results: tuple
-            A tuple containing:
-                - A dictionary containg, for each key, a batch tensor representing the input.
-                - A tensor containing the labels of the batch.
+        results: dict
+            A dict containing:
+                - A dictionary containg, for each key, a batch tensor representing the text input.
+                - A tensor containing the audio input of the batch
+                - (Optionally) A tensor containing the padded version of the motion input ids for the batch
+                - A tensor containing the classification labels of the batch.
     """
     max_len = 0
     max_len_motion = 0
@@ -139,20 +143,23 @@ def batch_generator_mult_bart(batch):
 
 def batch_generator_bart(batch):
     """
-        Generates the batch for the TextModel. It pads the sequences up to the lenght of the longest sequence in the batch and
-        group them by their key.
+        Generates the batch for the TextGenerationModel when the acoustic features are not used. 
+        It pads the input sequences and the motion up to the lenght of the longest one in the batch and groups them by their key.
+
         Parameters
         ----------
         batch: list of tuples
-            Where each tuple contains (input_example, label), with input_example that is a dictionary of type 
-            {'input_ids': [], 'attention_mask': []} and label that is the corresponding label id.
+            Where each tuple contains either (text_input, motion, label) or (text_input, label) 
+            with text_input and motion that are two dictionaries of type {'input_ids': [], 'attention_mask': []} and
+            label that is the corresponding classification label id.
         
         Returns
         ----------
-        results: tuple
-            A tuple containing:
-                - A dictionary containg, for each key, a batch tensor representing the input.
-                - A tensor containing the labels of the batch.
+        results: dict
+            A dict containing:
+                - A dictionary containg, for each key, a batch tensor representing the text input.
+                - (Optionally) A tensor containing the padded version of the motion input ids for the batch
+                - A tensor containing the classification labels of the batch.
     """
     max_len = 0
     max_len_motion = 0

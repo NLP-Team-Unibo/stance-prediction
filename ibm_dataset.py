@@ -43,6 +43,11 @@ class IBMDebater(Dataset):
                 Whether to load the audio files or not. Default to True.
             load_text: bool
                 Whether to load the text sentences or not. Default to True. 
+            sample_cut_type: str
+                Either 'first', 'last' or 'boh'. Whether to consider only the first/last textual tokens and 
+                audio seconds or to consider both. Default fo 'first'.
+            load_motion: bool
+                Whether to also load the motion or not. Default to False
             
         """
 

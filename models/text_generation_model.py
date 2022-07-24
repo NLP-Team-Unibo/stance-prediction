@@ -9,6 +9,21 @@ from models.mult_modules import transformer
 
 class CrossAttention(nn.Module):
     def __init__(self, embed_dim, num_heads, n_transformers):
+        """
+        Creates a crossmodal attention module: if n_transformers is 0, then the module is composed of
+        a simple multi-head attention layer, otherwise it's composed of a stack of Multimodal Transformer
+        Layers, inpired by the MulT architecture.
+
+        Parameters
+        ----------
+            - embed_dim: int
+                Dimension of the input embeddings
+            - num_heads: int
+                Numer of heads for the multi-head attention layers
+            - n_transformers: int
+                Number of transformer layers in the MulT encoder, if zero then the encoder is replaced by a
+                simple multi-head attention layer.
+        """
         super().__init__()
         assert n_transformers >= 0
         self.n_transformers = n_transformers
@@ -24,6 +39,7 @@ class CrossAttention(nn.Module):
                 res_dropout=0.1,
                 embed_dropout=0.25,
                 attn_mask=False)
+
     def forward(self, query, key, value):
         if self.n_transformers > 0:
             query = query.permute(1, 0, 2)
@@ -37,6 +53,13 @@ class CrossAttention(nn.Module):
         return x
 
 class BartCustomForSequenceClassification(BartForSequenceClassification):
+    """
+    Adapted from https://github.com/huggingface/transformers/blob/v4.20.1/src/transformers/models/bart/modeling_bart.py
+    Changes:
+        - Added an input parameter to __init__() in order be able to assign a custom model to self.model
+        - Removed the classification head and the loss computation
+        - Added an audio_embeddings input in forward()
+    """
     def __init__(self, config, model, **kwargs):
         super().__init__(config, **kwargs)
         self.model = model
@@ -89,31 +112,40 @@ class BartCustomForSequenceClassification(BartForSequenceClassification):
             return_dict=return_dict,
         )
         hidden_states = outputs[0]  # last hidden state
-
-        """eos_mask = input_ids.eq(self.config.eos_token_id)
-        print
-
-        if len(torch.unique_consecutive(eos_mask.sum(1))) > 1:
-            raise ValueError("All examples must have the same number of <eos> tokens.")
-        sentence_representation = hidden_states[eos_mask, :].view(hidden_states.size(0), -1, hidden_states.size(-1))[
-            :, -1, :
-        ]"""
         sentence_representation = hidden_states[:, -1, :]
         return sentence_representation
 
 class BartCustomForConditionalGeneration(BartForConditionalGeneration):
+    """
+    Adapted from https://github.com/huggingface/transformers/blob/v4.20.1/src/transformers/models/bart/modeling_bart.py
+    Changes:
+        - Added an input parameter to __init__() in order be able to assign a custom model to self.model
+        - Added an audio_embeddings input in forward()
+    """
     def __init__(self, config, model):
         super().__init__(config)
         self.model = model
     
-    def forward(self, input_ids=None, attention_mask=None, audio_embeddings=None, decoder_input_ids=None, decoder_attention_mask=None, head_mask=None, decoder_head_mask=None, cross_attn_head_mask=None, encoder_outputs=None, past_key_values=None, inputs_embeds=None, decoder_inputs_embeds=None, labels=None, use_cache=None, output_attentions=None, output_hidden_states=None, return_dict=None):
-        """
-        labels (`torch.LongTensor` of shape `(batch_size, sequence_length)`, *optional*):
-            Labels for computing the masked language modeling loss. Indices should either be in `[0, ...,
-            config.vocab_size]` or -100 (see `input_ids` docstring). Tokens with indices set to `-100` are ignored
-            (masked), the loss is only computed for the tokens with labels in `[0, ..., config.vocab_size]`.
-        Returns:
-        """
+    def forward(
+        self, 
+        input_ids=None, 
+        attention_mask=None, 
+        audio_embeddings=None, 
+        decoder_input_ids=None, 
+        decoder_attention_mask=None, 
+        head_mask=None, 
+        decoder_head_mask=None, 
+        cross_attn_head_mask=None, 
+        encoder_outputs=None, 
+        past_key_values=None, 
+        inputs_embeds=None, 
+        decoder_inputs_embeds=None, 
+        labels=None, 
+        use_cache=None, 
+        output_attentions=None, 
+        output_hidden_states=None, 
+        return_dict=None):
+
         return_dict = return_dict if return_dict is not None else self.config.use_return_dict
 
         if labels is not None:
@@ -171,12 +203,11 @@ from transformers.models.bart.modeling_bart import BartDecoder, BartEncoder
 
 class BartCustomDecoder(BartDecoder):
     """
-    Transformer decoder consisting of *config.decoder_layers* layers. Each layer is a [`BartDecoderLayer`]
-    Args:
-        config: BartConfig
-        embed_tokens (nn.Embedding): output embedding
+    Adapted from https://github.com/huggingface/transformers/blob/v4.20.1/src/transformers/models/bart/modeling_bart.py
+    Changes:
+        - Added CrossAttention module
+        - Added an audio_embeddings input in forward() and adapted the method to use the CrossAttention 
     """
-
     def __init__(self, config, embed_tokens, n_transformers=0, embed_audio_in_encoder=True):
         super().__init__(config, embed_tokens)
         self.embed_audio_in_encoder = embed_audio_in_encoder
@@ -225,6 +256,12 @@ class BartCustomDecoder(BartDecoder):
         return output        
 
 class BartCustomEncoder(BartEncoder):
+    """
+    Adapted from https://github.com/huggingface/transformers/blob/v4.20.1/src/transformers/models/bart/modeling_bart.py
+    Changes:
+        - Added CrossAttention module
+        - Added an audio_embeddings input in forward() and adapted the method to use the CrossAttention 
+    """
     _keys_to_ignore_on_load_missing = ['attn.in_proj_bias', 'attn.out_proj.weight', 
                                        'attn.out_proj.bias', 'attn.in_proj_weight', 
                                        'lm_head.weight', 'final_logits_bias', 
@@ -275,6 +312,12 @@ class BartCustomEncoder(BartEncoder):
         return output
 
 class BartCustomModel(BartModel):
+    """
+    Adapted from https://github.com/huggingface/transformers/blob/v4.20.1/src/transformers/models/bart/modeling_bart.py
+    Changes:
+        - Added the possibility of overriding self.encoder e self.decoder with our custom models
+        - Added an audio_embeddings input in forward() and adapted the method to use it
+    """
     def __init__(self, config, encoder, n_transformers=0, embed_audio_in_encoder=True):
         super().__init__(config)
         self.encoder = encoder
@@ -387,6 +430,34 @@ class TextGenerationModel(StancePredictionModule):
             generate_motion=True,
             embed_audio_in_encoder=True
         ):
+        """
+            Creates a Multi-task model combining a BartCustomencoder with two different BartCustomDecoder, one trained for text
+            generation and the other trained for text classification. If generate_motion=False, the Multi-task model becomes single task and
+            restricts itself to text classification. If use_audio=False, then the model doesn't use any multimodal information.
+    
+            Parameters
+            ----------
+            dropout_value: float
+                Dropout value to apply before passing the embeddings to the classification head. Default to 0.3.
+            bart_encoder_n_trainable_layers: int
+                Number of trainable BART encoder Transformer layers. Default to 6.
+            bart_decoder_cls_n_trainable_layers: int
+                Number of trainable BART dencoder Transformer layers for the classification model. Default to 6.
+            bart_decoder_gen_n_trainable_layers: int
+                Number of trainable BART dencoder Transformer layers for the generation model. Default to 6.
+            wav2vec2_n_transformers: int
+                Number of Transformer layers to use for wav2vec2.0. Default to 12.
+            wav2vec2_n_trainable_layers: int
+                Number of Transformer layers to train for wav2vec2.0. Default to 12.
+            cross_attn_n_layers: int
+                Number of Multimodal Transformer layers to use in the CrossAttention module. Default to 0.
+            use_audio: bool
+                Whether to use audio information or not. Default to True.
+            generate_motion: bool
+                Whether to use the text generation decoder or not. Default to True.
+            embed_audio_in_encoder: bool
+                Whether the CrossAttention module should be added after the custom BART encoder or after the custom BART decoder. Default to True.
+        """
         super(TextGenerationModel, self).__init__()
         self.use_audio = use_audio
         self.generate_motion = generate_motion
@@ -467,7 +538,6 @@ class TextGenerationModel(StancePredictionModule):
         if self.generate_motion:
             out = self.bart_gen(input_ids, attention_mask, out_audio, labels=labels_lm, return_dict=return_dict)
             loss_lm, encoder_outputs = out[0], (out[2], )
-            #_, encoder_outputs = out_bart
         
         out_cls = self.bart_cls(input_ids, attention_mask, out_audio, encoder_outputs=encoder_outputs, return_dict=return_dict)
 
