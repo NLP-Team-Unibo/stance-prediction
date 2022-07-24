@@ -33,6 +33,30 @@ Each model features a pre-trained architecture with a classification head attach
 
 The evaluation metric is accuracy. The evaluations on the test set showed that the best Text Model achieved 93.82%, the best Audio Model achieved 92.04% accuracy while the best Multimodal Model achieved a **94.65%** accuracy, showing a little improvement in using both audio and text signals.
 
+## Extension
+We wanted to investigate if audio features can be useful to predict the stance of political speeches without knowing the motion in advance. To investigate this new task we developed three different architectures:
+
+
+<table width=100%> 
+<tr> <td width=50%>
+<b>MulT-based model</b>: combines <a href="https://arxiv.org/abs/1910.01108"> DistilBERT </a> and <a href="https://arxiv.org/abs/2006.11477"> wav2vec 2.0 </a>outputs with a series of <a href="https://github.com/yaohungt/Multimodal-Transformer"> MulT </a></td> 
+
+<td align="center"><img src="docs/MulT.png" alt="1" width = 60%></td>
+</tr> 
+<tr> 
+<td> <b>BART for motion generation and stance classification</b>: predict the motion together with the stance of the speech by encoding the text using a <a href="https://arxiv.org/abs/1910.13461"> BART </a> encoder and two different BART decoders to extract features for the generative and the sequence classification task respectively. Using a series of crossmodal attentions, the extracted audio features are then combined with both generative and classification decoders.</td> 
+
+<td align="center"><img src="docs/BART_gen.png"alt="2" width = 85%> </td> 
+</tr> 
+
+
+<tr> <td> <b>BART for stance classification</b>: uses <a href="https://arxiv.org/abs/1910.13461"> BART </a>  textual signal and combines the outputs of its decoder with those of <a href="https://arxiv.org/abs/2006.11477"> wav2vec 2.0 </a>with a series of crossmodal attentions</td> 
+
+<td align="center"><img src="docs/BART_cls.png" alt="3" width = 60%> </td>
+</tr></table>
+
+
+
 ## Requirements
 The code requires python >= 2.7 as well as the libraries listed in requirements.txt:
 
